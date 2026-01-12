@@ -15,17 +15,21 @@ const AppContent: React.FC = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let authProcessed = false;
+    
     // Set a timeout to prevent infinite loading
     const loadingTimeout = setTimeout(() => {
-      console.warn('Loading timeout - falling back to demo mode');
-      setUser({
-        uid: 'demo-user-123',
-        email: 'demo@editiq.com',
-        displayName: 'Demo User',
-        photoURL: 'https://i.pravatar.cc/150?u=demo'
-      });
-      setLoading(false);
-    }, 10000); // 10 second timeout
+      if (!authProcessed) {
+        console.warn('Loading timeout - falling back to demo mode');
+        setUser({
+          uid: 'demo-user-123',
+          email: 'demo@editiq.com',
+          displayName: 'Demo User',
+          photoURL: 'https://i.pravatar.cc/150?u=demo'
+        });
+        setLoading(false);
+      }
+    }, 15000); // Increased to 15 seconds
 
     // Handle auth redirect with better error handling and mobile compatibility
     const handleAuthRedirect = async () => {
@@ -50,59 +54,62 @@ const AppContent: React.FC = () => {
           console.log('Found access token in URL, processing authentication...');
           // Clear the URL hash to clean up the URL
           window.history.replaceState(null, '', window.location.pathname);
+          
+          // Wait longer for Supabase to process the authentication
+          console.log('Waiting for Supabase to process authentication...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
-        // Try to get session with timeout
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session timeout')), 5000)
-        );
-
-        const { data, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
-        
-        if (error) {
-          console.warn('Auth session error (this is normal for demo mode):', error.message);
+        // Try to get session multiple times
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const { data, error } = await supabase.auth.getSession();
+            
+            if (data?.session?.user) {
+              console.log('User authenticated successfully:', data.session.user.email);
+              authProcessed = true;
+              setUser({
+                uid: data.session.user.id,
+                email: data.session.user.email || '',
+                displayName: data.session.user.user_metadata?.full_name || 'User',
+                photoURL: data.session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
+              });
+              clearTimeout(loadingTimeout);
+              setLoading(false);
+              return;
+            }
+            
+            if (error) {
+              console.warn(`Auth session attempt ${attempt + 1} error:`, error.message);
+            }
+            
+            // Wait before retry
+            if (attempt < 2) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+          } catch (sessionError) {
+            console.warn(`Session attempt ${attempt + 1} failed:`, sessionError);
+            if (attempt < 2) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+          }
         }
         
-        if (data?.session?.user) {
-          console.log('User authenticated:', data.session.user);
-          setUser({
-            uid: data.session.user.id,
-            email: data.session.user.email || '',
-            displayName: data.session.user.user_metadata?.full_name || 'User',
-            photoURL: data.session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
-          });
+        // If we had an access token but no session, something went wrong
+        if (accessToken && !authProcessed) {
+          console.error('Had access token but failed to get session - authentication failed');
+        }
+        
+        if (!authProcessed) {
           clearTimeout(loadingTimeout);
           setLoading(false);
-          return;
         }
-        
-        // If no session but we have access token, wait a bit for Supabase to process
-        if (accessToken) {
-          console.log('Waiting for Supabase to process authentication...');
-          setTimeout(async () => {
-            const { data: retryData } = await supabase.auth.getSession();
-            if (retryData?.session?.user) {
-              console.log('User authenticated after retry:', retryData.session.user);
-              setUser({
-                uid: retryData.session.user.id,
-                email: retryData.session.user.email || '',
-                displayName: retryData.session.user.user_metadata?.full_name || 'User',
-                photoURL: retryData.session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
-              });
-            }
-            clearTimeout(loadingTimeout);
-            setLoading(false);
-          }, 2000);
-          return;
-        }
-        
-        clearTimeout(loadingTimeout);
-        setLoading(false);
       } catch (error) {
-        console.warn('Session initialization error (falling back to demo mode):', error);
-        clearTimeout(loadingTimeout);
-        setLoading(false);
+        console.warn('Session initialization error:', error);
+        if (!authProcessed) {
+          clearTimeout(loadingTimeout);
+          setLoading(false);
+        }
       }
     }
 
@@ -111,19 +118,24 @@ const AppContent: React.FC = () => {
     // Listen for auth changes with error handling
     try {
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        console.log('Auth event:', event, session?.user?.email);
-        if (session?.user) {
+        console.log('Auth state change:', event, session?.user?.email || 'no user');
+        
+        if (session?.user && !authProcessed) {
+          console.log('User signed in via auth state change:', session.user.email);
+          authProcessed = true;
           setUser({
             uid: session.user.id,
             email: session.user.email || '',
             displayName: session.user.user_metadata?.full_name || 'User',
             photoURL: session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
           });
-        } else {
+          clearTimeout(loadingTimeout);
+          setLoading(false);
+        } else if (!session?.user && authProcessed) {
+          console.log('User signed out');
+          authProcessed = false;
           setUser(null);
         }
-        clearTimeout(loadingTimeout);
-        setLoading(false);
       });
 
       return () => {
@@ -132,8 +144,10 @@ const AppContent: React.FC = () => {
       };
     } catch (error) {
       console.warn('Auth state change listener error:', error);
-      clearTimeout(loadingTimeout);
-      setLoading(false);
+      if (!authProcessed) {
+        clearTimeout(loadingTimeout);
+        setLoading(false);
+      }
     }
   }, [])
 
