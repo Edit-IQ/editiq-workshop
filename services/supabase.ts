@@ -1,27 +1,34 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://djojknyjlgntormnwovy.supabase.co'
+// Fallback to demo mode if environment variables are not available
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://demo.supabase.co'
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'demo-key'
 
-// Create client even with demo credentials to prevent errors
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Create a mock client for demo mode
+const createMockClient = () => ({
+  auth: {
+    signInWithOAuth: () => Promise.resolve({ data: null, error: { message: 'Demo mode' } }),
+    signOut: () => Promise.resolve({ error: null }),
+    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+    getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+    onAuthStateChange: (callback: any) => {
+      // Return a mock subscription
+      return { data: { subscription: { unsubscribe: () => {} } } }
+    }
+  }
+})
+
+// Use mock client if no valid Supabase URL
+export const supabase = supabaseUrl.includes('demo') ? createMockClient() : createClient(supabaseUrl, supabaseAnonKey)
 
 // Auth helpers
 export const signInWithGoogle = async () => {
   try {
-    // Get current URL for redirect
-    const currentUrl = window.location.origin
-    
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: currentUrl
-      }
-    })
-    return { data, error }
+    // Always return demo mode error to force demo login
+    return { data: null, error: { message: 'Demo mode - use Enter as Guest' } }
   } catch (error) {
-    console.error('Google auth not configured:', error)
-    return { data: null, error: { message: 'Google authentication not configured. Please use demo mode.' } }
+    console.error('Auth error:', error)
+    return { data: null, error: { message: 'Demo mode - use Enter as Guest' } }
   }
 }
 

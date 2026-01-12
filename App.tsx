@@ -15,58 +15,13 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Handle auth redirect
-    const handleAuthRedirect = async () => {
-      const { data, error } = await supabase.auth.getSession()
-      if (error) {
-        console.error('Auth error:', error)
-      }
-      if (data.session?.user) {
-        setUser({
-          uid: data.session.user.id,
-          email: data.session.user.email || '',
-          displayName: data.session.user.user_metadata?.full_name || 'User',
-          photoURL: data.session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
-        })
-      }
-      setLoading(false)
-    }
-
-    handleAuthRedirect()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth event:', event, session)
-      if (session?.user) {
-        setUser({
-          uid: session.user.id,
-          email: session.user.email || '',
-          displayName: session.user.user_metadata?.full_name || 'User',
-          photoURL: session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
-        })
-      } else {
-        setUser(null)
-      }
-      setLoading(false)
-    })
-
-    return () => subscription.unsubscribe()
+    // Skip auth redirect handling and go straight to demo mode for now
+    setLoading(false)
   }, [])
 
   const handleLogin = async () => {
-    try {
-      const { error } = await signInWithGoogle()
-      if (error) {
-        console.error('Login error:', error)
-        // Don't show alert, just log the error
-        console.log('Google login not configured. Using demo mode instead.')
-        handleDemoMode()
-      }
-    } catch (error) {
-      console.error('Login error:', error)
-      // Fallback to demo mode if Google auth fails
-      handleDemoMode()
-    }
+    // For now, just go to demo mode
+    handleDemoMode()
   }
 
   const handleDemoMode = () => {
