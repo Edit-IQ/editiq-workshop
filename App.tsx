@@ -82,8 +82,8 @@ const AppContent: React.FC = () => {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const isWebView = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
       
-      // Always use production URL for redirect
-      const redirectUrl = 'https://editiq-workflow.netlify.app/';
+      // Use GitHub Pages URL for redirect
+      const redirectUrl = 'https://edit-iq.github.io/editiq-workshop/';
       
       if (isMobile || isWebView) {
         // For mobile/WebView, use popup mode which works better
