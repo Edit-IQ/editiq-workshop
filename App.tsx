@@ -15,140 +15,103 @@ const AppContent: React.FC = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let authProcessed = false;
+    let mounted = true;
     
-    // Set a timeout to prevent infinite loading
-    const loadingTimeout = setTimeout(() => {
-      if (!authProcessed) {
-        console.warn('Loading timeout - falling back to demo mode');
-        setUser({
-          uid: 'demo-user-123',
-          email: 'demo@editiq.com',
-          displayName: 'Demo User',
-          photoURL: 'https://i.pravatar.cc/150?u=demo'
-        });
-        setLoading(false);
-      }
-    }, 15000); // Increased to 15 seconds
-
-    // Handle auth redirect with better error handling and mobile compatibility
-    const handleAuthRedirect = async () => {
+    const handleAuth = async () => {
       try {
-        // Add mobile-specific initialization
-        if (typeof window !== 'undefined') {
-          // Prevent zoom on iOS
-          document.addEventListener('touchstart', function() {}, { passive: true });
-          
-          // Handle mobile viewport
-          const viewport = document.querySelector('meta[name=viewport]');
-          if (viewport) {
-            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
-          }
-        }
-
-        // Check if we have auth tokens in URL hash
+        // Check for auth tokens in URL
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         
         if (accessToken) {
-          console.log('Found access token in URL, processing authentication...');
-          // Clear the URL hash to clean up the URL
+          console.log('Found access token, cleaning URL and waiting for session...');
+          // Clean URL immediately
           window.history.replaceState(null, '', window.location.pathname);
           
-          // Wait longer for Supabase to process the authentication
-          console.log('Waiting for Supabase to process authentication...');
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          // Wait for Supabase to process the authentication
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
-        // Try to get session multiple times
-        for (let attempt = 0; attempt < 3; attempt++) {
-          try {
-            const { data, error } = await supabase.auth.getSession();
-            
-            if (data?.session?.user) {
-              console.log('User authenticated successfully:', data.session.user.email);
-              authProcessed = true;
-              setUser({
-                uid: data.session.user.id,
-                email: data.session.user.email || '',
-                displayName: data.session.user.user_metadata?.full_name || 'User',
-                photoURL: data.session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
-              });
-              clearTimeout(loadingTimeout);
-              setLoading(false);
-              return;
-            }
-            
-            if (error) {
-              console.warn(`Auth session attempt ${attempt + 1} error:`, error.message);
-            }
-            
-            // Wait before retry
-            if (attempt < 2) {
-              await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-          } catch (sessionError) {
-            console.warn(`Session attempt ${attempt + 1} failed:`, sessionError);
-            if (attempt < 2) {
-              await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-          }
+        // Get current session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.warn('Session error:', error.message);
         }
         
-        // If we had an access token but no session, something went wrong
-        if (accessToken && !authProcessed) {
-          console.error('Had access token but failed to get session - authentication failed');
-        }
-        
-        if (!authProcessed) {
-          clearTimeout(loadingTimeout);
-          setLoading(false);
-        }
-      } catch (error) {
-        console.warn('Session initialization error:', error);
-        if (!authProcessed) {
-          clearTimeout(loadingTimeout);
-          setLoading(false);
-        }
-      }
-    }
-
-    handleAuthRedirect();
-
-    // Listen for auth changes with error handling
-    try {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        console.log('Auth state change:', event, session?.user?.email || 'no user');
-        
-        if (session?.user && !authProcessed) {
-          console.log('User signed in via auth state change:', session.user.email);
-          authProcessed = true;
+        if (session?.user && mounted) {
+          console.log('✅ User authenticated:', session.user.email);
           setUser({
             uid: session.user.id,
             email: session.user.email || '',
             displayName: session.user.user_metadata?.full_name || 'User',
             photoURL: session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
           });
-          clearTimeout(loadingTimeout);
           setLoading(false);
-        } else if (!session?.user && authProcessed) {
-          console.log('User signed out');
-          authProcessed = false;
-          setUser(null);
+          return;
         }
-      });
+        
+        // If we had a token but no session, wait a bit more
+        if (accessToken && !session && mounted) {
+          console.log('Retrying session after token processing...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          const { data: { session: retrySession } } = await supabase.auth.getSession();
+          if (retrySession?.user && mounted) {
+            console.log('✅ User authenticated on retry:', retrySession.user.email);
+            setUser({
+              uid: retrySession.user.id,
+              email: retrySession.user.email || '',
+              displayName: retrySession.user.user_metadata?.full_name || 'User',
+              photoURL: retrySession.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
+            });
+            setLoading(false);
+            return;
+          }
+        }
+        
+        if (mounted) {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth error:', error);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
 
-      return () => {
-        subscription.unsubscribe();
-        clearTimeout(loadingTimeout);
-      };
-    } catch (error) {
-      console.warn('Auth state change listener error:', error);
-      if (!authProcessed) {
-        clearTimeout(loadingTimeout);
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 Auth state change:', event, session?.user?.email || 'no user');
+      
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user && mounted) {
+        console.log('✅ User authenticated via state change:', session.user.email);
+        setUser({
+          uid: session.user.id,
+          email: session.user.email || '',
+          displayName: session.user.user_metadata?.full_name || 'User',
+          photoURL: session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
+        });
+        setLoading(false);
+      } else if (event === 'SIGNED_OUT' && mounted) {
+        console.log('🚪 User signed out');
+        setUser(null);
+        setLoading(false);
+      } else if (!session?.user && mounted && (event === 'INITIAL_SESSION')) {
+        console.log('No user session found');
         setLoading(false);
       }
-    }
+    });
+
+    // Initialize auth
+    handleAuth();
+
+    // Cleanup
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [])
 
   const handleLogin = async () => {
