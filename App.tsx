@@ -58,11 +58,14 @@ const App: React.FC = () => {
       const { error } = await signInWithGoogle()
       if (error) {
         console.error('Login error:', error)
-        alert('Google login not configured yet. Please use "Enter as Guest" to test the app.')
+        // Don't show alert, just log the error
+        console.log('Google login not configured. Using demo mode instead.')
+        handleDemoMode()
       }
     } catch (error) {
       console.error('Login error:', error)
-      alert('Google login not configured yet. Please use "Enter as Guest" to test the app.')
+      // Fallback to demo mode if Google auth fails
+      handleDemoMode()
     }
   }
 

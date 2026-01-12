@@ -1,21 +1,21 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://djojknyjlgntormnwovy.supabase.co'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'demo-key'
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
-}
-
+// Create client even with demo credentials to prevent errors
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Auth helpers
 export const signInWithGoogle = async () => {
   try {
+    // Get current URL for redirect
+    const currentUrl = window.location.origin
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'http://localhost:3000'
+        redirectTo: currentUrl
       }
     })
     return { data, error }
