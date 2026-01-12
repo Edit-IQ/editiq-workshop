@@ -144,36 +144,28 @@ export const firebaseDb = {
       const firebaseUserId = this.getFirebaseUserId(userId);
       console.log('🔍 Firebase: Fetching clients for userId:', userId, '-> Firebase userId:', firebaseUserId);
       
-      // First, try to get all clients to see what's in the database
-      const allClientsQuery = query(collection(db, 'clients'));
-      const allSnapshot = await getDocs(allClientsQuery);
-      
-      console.log('📊 Firebase: Total clients in database:', allSnapshot.size);
-      allSnapshot.forEach((doc) => {
-        const data = doc.data();
-        console.log('📄 Client doc:', doc.id, 'userId:', data.userId, 'name:', data.name);
-      });
-      
-      // Now try the filtered query with the mapped user ID
+      // Simplified query without orderBy to avoid index issues
       const q = query(
         collection(db, 'clients'),
-        where('userId', '==', firebaseUserId),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', firebaseUserId)
       );
       
       const querySnapshot = await getDocs(q);
       const clients: Client[] = [];
       
-      console.log('🎯 Firebase: Filtered clients found:', querySnapshot.size);
+      console.log('🎯 Firebase: Clients found:', querySnapshot.size);
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        console.log('✅ Matched client:', doc.id, data.name);
+        console.log('✅ Client:', doc.id, data.name);
         clients.push({
           id: doc.id,
           ...data,
           createdAt: data.createdAt?.toMillis() || Date.now()
         } as Client);
       });
+      
+      // Sort in memory instead of using orderBy
+      clients.sort((a, b) => b.createdAt - a.createdAt);
       
       return clients;
     } catch (error) {
@@ -193,12 +185,11 @@ export const firebaseDb = {
       return () => clearInterval(interval);
     }
     
-    // For real users, use Firestore real-time with mapped user ID
+    // For real users, use Firestore real-time with mapped user ID (simplified query)
     const firebaseUserId = this.getFirebaseUserId(userId);
     const q = query(
       collection(db, 'clients'),
-      where('userId', '==', firebaseUserId),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', firebaseUserId)
     );
     
     return onSnapshot(q, (querySnapshot) => {
@@ -211,6 +202,8 @@ export const firebaseDb = {
           createdAt: data.createdAt?.toMillis() || Date.now()
         } as Client);
       });
+      // Sort in memory
+      clients.sort((a, b) => b.createdAt - a.createdAt);
       callback(clients);
     });
   },
@@ -289,35 +282,30 @@ export const firebaseDb = {
       const firebaseUserId = this.getFirebaseUserId(userId);
       console.log('🔍 Firebase: Fetching transactions for userId:', userId, '-> Firebase userId:', firebaseUserId);
       
-      // First, try to get all transactions to see what's in the database
-      const allTransactionsQuery = query(collection(db, 'transactions'));
-      const allSnapshot = await getDocs(allTransactionsQuery);
-      
-      console.log('📊 Firebase: Total transactions in database:', allSnapshot.size);
-      allSnapshot.forEach((doc) => {
-        const data = doc.data();
-        console.log('📄 Transaction doc:', doc.id, 'userId:', data.userId, 'amount:', data.amount, 'type:', data.type);
-      });
-      
-      // Now try the filtered query with mapped user ID
+      // Simplified query without orderBy to avoid index issues
       const q = query(
         collection(db, 'transactions'),
-        where('userId', '==', firebaseUserId),
-        orderBy('date', 'desc')
+        where('userId', '==', firebaseUserId)
       );
       
       const querySnapshot = await getDocs(q);
       const transactions: Transaction[] = [];
       
-      console.log('🎯 Firebase: Filtered transactions found:', querySnapshot.size);
+      console.log('🎯 Firebase: Transactions found:', querySnapshot.size);
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        console.log('✅ Matched transaction:', doc.id, data.amount, data.type);
+        console.log('✅ Transaction:', doc.id, data.amount, data.type);
+        // Normalize transaction type to uppercase to match enum
+        const normalizedType = typeof data.type === 'string' ? data.type.toUpperCase() : data.type;
         transactions.push({
           id: doc.id,
-          ...data
+          ...data,
+          type: normalizedType // Ensure type matches TransactionType enum
         } as Transaction);
       });
+      
+      // Sort in memory by date
+      transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
       return transactions;
     } catch (error) {
@@ -339,8 +327,7 @@ export const firebaseDb = {
     const firebaseUserId = this.getFirebaseUserId(userId);
     const q = query(
       collection(db, 'transactions'),
-      where('userId', '==', firebaseUserId),
-      orderBy('date', 'desc')
+      where('userId', '==', firebaseUserId)
     );
     
     return onSnapshot(q, (querySnapshot) => {
@@ -355,6 +342,8 @@ export const firebaseDb = {
           type: normalizedType // Ensure type matches TransactionType enum
         } as Transaction);
       });
+      // Sort in memory by date
+      transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       callback(transactions);
     });
   },
