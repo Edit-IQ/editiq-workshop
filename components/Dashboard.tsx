@@ -25,7 +25,7 @@ import {
   CloudLightning
 } from 'lucide-react';
 import { Transaction, TransactionType, Client } from '../types';
-import { firebaseDb } from '../services/firebaseDb';
+import { firebaseDb, testFirestoreConnection } from '../services/firebaseDb';
 import { localDb } from '../services/localDb';
 import { ExportService } from '../services/exportService';
 import { BackupService } from '../services/backupService';
@@ -300,6 +300,16 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
     }
   };
 
+  const handleTestFirestore = async () => {
+    console.log('🧪 Testing Firestore connection...');
+    const success = await testFirestoreConnection();
+    if (success) {
+      alert('✅ Firestore connection successful! Check console for details.');
+    } else {
+      alert('❌ Firestore connection failed. Check console for errors.');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || parseFloat(amount) <= 0) return;
@@ -383,6 +393,12 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
           
           {/* Export Buttons */}
           <div className="flex gap-3">
+             <button 
+               onClick={handleTestFirestore}
+               className="px-4 py-3 bg-purple-600 border border-purple-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-purple-700 transition-all flex items-center gap-2 text-white active:scale-95"
+             >
+                <Database size={14} /> Test DB
+             </button>
              <button 
                onClick={handleExportCSV}
                className="px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest hover:border-blue-500 transition-all flex items-center gap-2 text-slate-400 active:scale-95"

@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCVETgTKYN4FY3OxV81wERGjbvPFsK_Cz0",
@@ -8,8 +8,8 @@ const firebaseConfig = {
   projectId: "spontaneous-pixie-1a76e9",
   storageBucket: "spontaneous-pixie-1a76e9.firebasestorage.app",
   messagingSenderId: "911257745432",
-  appId: "1:911257745432:web:798307aed3780458996b6d",
-  measurementId: "G-RDNBMGDZ76"
+  appId: "1:911257745432:web:798307aed3780458996b6d"
+  // Removed measurementId to avoid analytics issues
 };
 
 // Initialize Firebase
@@ -29,6 +29,7 @@ export const signInWithGoogle = async () => {
     console.log('Starting Firebase Google login...');
     const result = await signInWithPopup(auth, googleProvider);
     console.log('✅ Firebase login successful:', result.user.email);
+    console.log('✅ User ID:', result.user.uid);
     return { user: result.user, error: null };
   } catch (error: any) {
     console.error('Firebase login error:', error);
@@ -48,7 +49,21 @@ export const signOut = async () => {
 };
 
 export const onAuthStateChange = (callback: (user: any) => void) => {
-  return onAuthStateChanged(auth, callback);
+  return onAuthStateChanged(auth, (user) => {
+    if (user) {
+      console.log('✅ Auth state change - User:', user.email, 'UID:', user.uid);
+      console.log('🔍 Full user object:', {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        providerId: user.providerData[0]?.providerId,
+        providerUid: user.providerData[0]?.uid
+      });
+    } else {
+      console.log('🚪 Auth state change - No user');
+    }
+    callback(user);
+  });
 };
 
 export { app };

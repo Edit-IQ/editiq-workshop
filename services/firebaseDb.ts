@@ -8,10 +8,38 @@ import {
   where, 
   orderBy, 
   onSnapshot,
-  Timestamp 
+  Timestamp,
+  getDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Client, Transaction, Credential } from '../types';
+
+// Test function to check Firestore connectivity
+export const testFirestoreConnection = async () => {
+  try {
+    console.log('🧪 Testing Firestore connection...');
+    
+    // Try to read from a simple collection
+    const testCollection = collection(db, 'test');
+    const snapshot = await getDocs(testCollection);
+    console.log('✅ Firestore connection successful, test collection size:', snapshot.size);
+    
+    // Try to read all clients without filters
+    const clientsCollection = collection(db, 'clients');
+    const clientsSnapshot = await getDocs(clientsCollection);
+    console.log('✅ Clients collection accessible, total docs:', clientsSnapshot.size);
+    
+    // Try to read all transactions without filters
+    const transactionsCollection = collection(db, 'transactions');
+    const transactionsSnapshot = await getDocs(transactionsCollection);
+    console.log('✅ Transactions collection accessible, total docs:', transactionsSnapshot.size);
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Firestore connection test failed:', error);
+    return false;
+  }
+};
 
 export const firebaseDb = {
   // Check if we should use localStorage (for demo users only)
@@ -28,6 +56,19 @@ export const firebaseDb = {
     }
 
     try {
+      console.log('🔍 Firebase: Fetching clients for userId:', userId);
+      
+      // First, try to get all clients to see what's in the database
+      const allClientsQuery = query(collection(db, 'clients'));
+      const allSnapshot = await getDocs(allClientsQuery);
+      
+      console.log('📊 Firebase: Total clients in database:', allSnapshot.size);
+      allSnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('📄 Client doc:', doc.id, 'userId:', data.userId, 'name:', data.name);
+      });
+      
+      // Now try the filtered query
       const q = query(
         collection(db, 'clients'),
         where('userId', '==', userId),
@@ -37,8 +78,10 @@ export const firebaseDb = {
       const querySnapshot = await getDocs(q);
       const clients: Client[] = [];
       
+      console.log('🎯 Firebase: Filtered clients found:', querySnapshot.size);
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        console.log('✅ Matched client:', doc.id, data.name);
         clients.push({
           id: doc.id,
           ...data,
@@ -150,6 +193,19 @@ export const firebaseDb = {
     }
 
     try {
+      console.log('🔍 Firebase: Fetching transactions for userId:', userId);
+      
+      // First, try to get all transactions to see what's in the database
+      const allTransactionsQuery = query(collection(db, 'transactions'));
+      const allSnapshot = await getDocs(allTransactionsQuery);
+      
+      console.log('📊 Firebase: Total transactions in database:', allSnapshot.size);
+      allSnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('📄 Transaction doc:', doc.id, 'userId:', data.userId, 'amount:', data.amount, 'type:', data.type);
+      });
+      
+      // Now try the filtered query
       const q = query(
         collection(db, 'transactions'),
         where('userId', '==', userId),
@@ -159,8 +215,10 @@ export const firebaseDb = {
       const querySnapshot = await getDocs(q);
       const transactions: Transaction[] = [];
       
+      console.log('🎯 Firebase: Filtered transactions found:', querySnapshot.size);
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        console.log('✅ Matched transaction:', doc.id, data.amount, data.type);
         transactions.push({
           id: doc.id,
           ...data
