@@ -28,6 +28,7 @@ import { Transaction, TransactionType, Client } from '../types';
 import { supabaseDb } from '../services/supabaseDb';
 import { localDb } from '../services/localDb';
 import { ExportService } from '../services/exportService';
+import { BackupService } from '../services/backupService';
 
 const COLORS = ['#3b82f6', '#0ea5e9', '#6366f1', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316'];
 const INCOME_COLOR = '#3b82f6';
@@ -265,8 +266,38 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
     );
   };
 
-  const handleExportBackup = () => {
-    ExportService.exportFullBackup(transactions, clients);
+  const handleExportBackup = async () => {
+    try {
+      console.log('Starting backup for user:', userId)
+      const backupData = await BackupService.exportAllData(userId)
+      BackupService.downloadBackup(backupData)
+      
+      // Also try manual Supabase backup if RLS is blocking
+      if (userId !== 'demo-user-123') {
+        try {
+          const manualBackup = await BackupService.manualSupabaseBackup()
+          if (manualBackup.clients.length > 0 || manualBackup.transactions.length > 0 || manualBackup.credentials.length > 0) {
+            const fullBackup = {
+              exportDate: new Date().toISOString(),
+              userId: userId,
+              source: 'manual-supabase',
+              data: manualBackup,
+              summary: {
+                totalClients: manualBackup.clients.length,
+                totalTransactions: manualBackup.transactions.length,
+                totalCredentials: manualBackup.credentials.length
+              }
+            }
+            BackupService.downloadBackup(fullBackup, `editiq-manual-backup-${new Date().toISOString().split('T')[0]}.json`)
+          }
+        } catch (error) {
+          console.warn('Manual backup failed, using regular backup:', error)
+        }
+      }
+    } catch (error) {
+      console.error('Backup failed:', error)
+      alert('Backup failed. Please try again.')
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -366,9 +397,9 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
              </button>
              <button 
                onClick={handleExportBackup}
-               className="px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest hover:border-green-500 transition-all flex items-center gap-2 text-slate-400 active:scale-95"
+               className="px-4 py-3 bg-green-600 border border-green-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-green-700 transition-all flex items-center gap-2 text-white active:scale-95"
              >
-                <Database size={14} /> Backup
+                <CloudLightning size={14} /> Full Backup
              </button>
           </div>
         </div>

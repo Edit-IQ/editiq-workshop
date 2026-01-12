@@ -52,12 +52,12 @@ const AppContent: React.FC = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Handle auth redirect
+    // Handle auth redirect with better error handling
     const handleAuthRedirect = async () => {
       try {
         const { data, error } = await supabase.auth.getSession()
         if (error) {
-          console.error('Auth error:', error)
+          console.warn('Auth session error (this is normal for demo mode):', error.message)
         }
         if (data.session?.user) {
           setUser({
@@ -68,42 +68,54 @@ const AppContent: React.FC = () => {
           })
         }
       } catch (error) {
-        console.error('Session error:', error)
+        console.warn('Session initialization error (this is normal for demo mode):', error)
       }
       setLoading(false)
     }
 
     handleAuthRedirect()
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth event:', event, session)
-      if (session?.user) {
-        setUser({
-          uid: session.user.id,
-          email: session.user.email || '',
-          displayName: session.user.user_metadata?.full_name || 'User',
-          photoURL: session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
-        })
-      } else {
-        setUser(null)
-      }
-      setLoading(false)
-    })
+    // Listen for auth changes with error handling
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('Auth event:', event)
+        if (session?.user) {
+          setUser({
+            uid: session.user.id,
+            email: session.user.email || '',
+            displayName: session.user.user_metadata?.full_name || 'User',
+            photoURL: session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
+          })
+        } else {
+          setUser(null)
+        }
+        setLoading(false)
+      })
 
-    return () => subscription.unsubscribe()
+      return () => subscription.unsubscribe()
+    } catch (error) {
+      console.warn('Auth state change listener error:', error)
+      setLoading(false)
+    }
   }, [])
 
   const handleLogin = async () => {
     try {
-      const { error } = await signInWithGoogle()
+      console.log('Starting Google login...')
+      const { data, error } = await signInWithGoogle()
+      
       if (error) {
-        console.error('Login error:', error)
-        alert('Login failed. You can use "Enter as Guest" to test the app.')
+        console.error('Google login error:', error)
+        alert(`Login failed: ${error.message}. Please check your internet connection and try again.`)
+        return
       }
+      
+      console.log('Google login initiated successfully:', data)
+      // Don't set user here - let the auth state change handler do it
+      
     } catch (error) {
       console.error('Login error:', error)
-      alert('Login failed. You can use "Enter as Guest" to test the app.')
+      alert('Login failed. Please try again or use "Enter as Guest".')
     }
   }
 

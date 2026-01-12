@@ -8,13 +8,25 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 // Auth helpers
 export const signInWithGoogle = async () => {
   try {
+    console.log('Initiating Google OAuth...')
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin
+        redirectTo: window.location.origin,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
       }
     })
-    return { data, error }
+    
+    if (error) {
+      console.error('OAuth error:', error)
+      return { data: null, error }
+    }
+    
+    console.log('OAuth initiated successfully')
+    return { data, error: null }
   } catch (error) {
     console.error('Google auth error:', error)
     return { data: null, error }

@@ -2,9 +2,9 @@ import { supabase } from './supabase'
 import { Client, Transaction, Credential, TransactionType } from '../types'
 
 export const supabaseDb = {
-  // Check if we should use localStorage (for demo users)
+  // Check if we should use localStorage (for demo users only)
   shouldUseLocalStorage(userId: string): boolean {
-    return userId === 'demo-user-123' || !userId.includes('@');
+    return userId === 'demo-user-123';
   },
 
   // Clients
