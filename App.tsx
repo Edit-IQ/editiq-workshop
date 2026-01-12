@@ -42,6 +42,16 @@ const AppContent: React.FC = () => {
           }
         }
 
+        // Check if we have auth tokens in URL hash
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        
+        if (accessToken) {
+          console.log('Found access token in URL, processing authentication...');
+          // Clear the URL hash to clean up the URL
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+
         // Try to get session with timeout
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => 
@@ -55,12 +65,36 @@ const AppContent: React.FC = () => {
         }
         
         if (data?.session?.user) {
+          console.log('User authenticated:', data.session.user);
           setUser({
             uid: data.session.user.id,
             email: data.session.user.email || '',
             displayName: data.session.user.user_metadata?.full_name || 'User',
             photoURL: data.session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
           });
+          clearTimeout(loadingTimeout);
+          setLoading(false);
+          return;
+        }
+        
+        // If no session but we have access token, wait a bit for Supabase to process
+        if (accessToken) {
+          console.log('Waiting for Supabase to process authentication...');
+          setTimeout(async () => {
+            const { data: retryData } = await supabase.auth.getSession();
+            if (retryData?.session?.user) {
+              console.log('User authenticated after retry:', retryData.session.user);
+              setUser({
+                uid: retryData.session.user.id,
+                email: retryData.session.user.email || '',
+                displayName: retryData.session.user.user_metadata?.full_name || 'User',
+                photoURL: retryData.session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
+              });
+            }
+            clearTimeout(loadingTimeout);
+            setLoading(false);
+          }, 2000);
+          return;
         }
         
         clearTimeout(loadingTimeout);
@@ -77,7 +111,7 @@ const AppContent: React.FC = () => {
     // Listen for auth changes with error handling
     try {
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        console.log('Auth event:', event);
+        console.log('Auth event:', event, session?.user?.email);
         if (session?.user) {
           setUser({
             uid: session.user.id,
