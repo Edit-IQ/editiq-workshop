@@ -112,6 +112,18 @@ const AppContent: React.FC = () => {
     setLoading(false)
   }
 
+  const handleTestYourAccount = () => {
+    console.log('🧪 Creating test user for your account...')
+    // Create a test user that uses your specific data
+    setUser({
+      uid: 'test-firebase-user-456', // This will map to your old data
+      email: 'deyankur.391@gmail.com', // Your real Firebase email
+      displayName: 'Deyankur',
+      photoURL: 'https://lh3.googleusercontent.com/a/ACg8ocLQ9jmOkvNTf3WZBxA878NKYExP2FzJe0dB6RrbqTAw6hW-foU=s96-c'
+    })
+    setLoading(false)
+  }
+
   const handleLogout = async () => {
     await signOut()
     setUser(null)
@@ -166,6 +178,14 @@ const AppContent: React.FC = () => {
             >
               <LogIn size={22} /> 
               Sign in with Google
+            </button>
+            
+            <button 
+              onClick={handleTestYourAccount}
+              className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-all text-xs uppercase tracking-widest active:scale-95"
+            >
+              <Briefcase size={14} />
+              Access Your Data
             </button>
             
             <button 

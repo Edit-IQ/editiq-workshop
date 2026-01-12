@@ -119,16 +119,15 @@ export const firebaseDb = {
   getFirebaseUserId(currentUserId: string): string {
     console.log('🔍 Mapping user ID:', currentUserId);
     
-    // If this is your real account, use the specific old Firebase user ID
+    // Only map to your specific old data if it's your exact account
     if (currentUserId === 'test-firebase-user-456' || 
-        currentUserId.includes('editiq2003') ||
-        currentUserId.includes('deyankur.391') ||
-        currentUserId !== 'demo-user-123') {
-      console.log('✅ Using Firebase user ID: WpskF7imp5SEp28t0t22v5wA');
-      return 'WpskF7imp5SEp28t0t22v5wA'; // Your exact Firebase user ID for deyankur.391@gmail.com
+        currentUserId.includes('deyankur.391@gmail.com')) {
+      console.log('✅ Using your old Firebase user ID: WpskF7imp5SEp28t0t22v5wA');
+      return 'WpskF7imp5SEp28t0t22v5wA'; // Your specific Firebase user ID for deyankur.391@gmail.com
     }
     
-    console.log('✅ Using original user ID:', currentUserId);
+    // For all other users, use their actual user ID (separate data)
+    console.log('✅ Using actual user ID for separate data:', currentUserId);
     return currentUserId;
   },
 
