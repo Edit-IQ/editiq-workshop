@@ -9,43 +9,6 @@ import WorkspacePage from './components/WorkspacePage'
 import { LayoutDashboard, Users, Receipt, BrainCircuit, Shield, LogOut, LogIn, ArrowRight, Briefcase } from 'lucide-react'
 import { UserProfile } from './types'
 
-// Error Boundary Component
-class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
-  constructor(props: {children: React.ReactNode}) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('App Error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="h-screen flex flex-col items-center justify-center bg-[#020617] text-white p-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
-            <p className="text-slate-400 mb-6">Please refresh the page to try again</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
 const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [user, setUser] = useState<UserProfile | null>(null)
@@ -306,11 +269,7 @@ const AppContent: React.FC = () => {
 }
 
 const App: React.FC = () => {
-  return (
-    <ErrorBoundary>
-      <AppContent />
-    </ErrorBoundary>
-  );
+  return <AppContent />;
 }
 
 export default App
