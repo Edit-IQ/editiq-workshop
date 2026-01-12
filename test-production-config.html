@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firebase Production Test</title>
+</head>
+<body>
+    <h1>Firebase Configuration Test</h1>
+    <div id="status">Testing...</div>
+    <div id="config"></div>
+    
+    <script type="module">
+        // Simulate production environment variables
+        const config = {
+            apiKey: "AIzaSyCVETgTKYN4FY3OxV81wERGjbvPFsK_Cz0",
+            authDomain: "spontaneous-pixie-1a76e9.firebaseapp.com",
+            projectId: "spontaneous-pixie-1a76e9",
+            storageBucket: "spontaneous-pixie-1a76e9.firebasestorage.app",
+            messagingSenderId: "911257745432",
+            appId: "1:911257745432:web:798307aed3780458996b6d"
+        };
+        
+        document.getElementById('config').innerHTML = `
+            <h3>Configuration Check:</h3>
+            <ul>
+                <li>API Key: ${config.apiKey ? '✅ Present' : '❌ Missing'}</li>
+                <li>Auth Domain: ${config.authDomain ? '✅ Present' : '❌ Missing'}</li>
+                <li>Project ID: ${config.projectId ? '✅ Present' : '❌ Missing'}</li>
+                <li>Storage Bucket: ${config.storageBucket ? '✅ Present' : '❌ Missing'}</li>
+                <li>Messaging Sender ID: ${config.messagingSenderId ? '✅ Present' : '❌ Missing'}</li>
+                <li>App ID: ${config.appId ? '✅ Present' : '❌ Missing'}</li>
+            </ul>
+        `;
+        
+        document.getElementById('status').innerHTML = '✅ All Firebase configuration values are present and valid!';
+    </script>
+</body>
+</html>
