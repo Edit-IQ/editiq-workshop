@@ -3,19 +3,28 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://djojknyjlgntormnwovy.supabase.co'
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqb2prbmVqbGdudG9ybW53b3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY2Nzc0MjQsImV4cCI6MjA1MjI1MzQyNH0.2vhAL-dRxmvOECGmdr2Mcrg_2vhAL'
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  },
+  global: {
+    headers: {
+      'x-application-name': 'editiq-workflow'
+    }
+  }
+})
 
-// Auth helpers with mobile compatibility
+// Auth helpers with mobile compatibility and faster timeouts
 export const signInWithGoogle = async () => {
   try {
     console.log('Initiating Google OAuth...')
     
-    // Detect mobile/WebView environment
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isWebView = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
-    
-    // Use GitHub Pages URL for redirect
-    const redirectUrl = 'https://edit-iq.github.io/editiq-workshop/';
+    // Use appropriate URL based on environment
+    const redirectUrl = window.location.hostname === 'localhost' 
+      ? 'http://localhost:3000/' 
+      : 'https://edit-iq.github.io/editiq-workshop/';
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -25,7 +34,6 @@ export const signInWithGoogle = async () => {
           access_type: 'offline',
           prompt: 'consent',
         },
-        // For mobile/WebView, don't skip browser redirect
         skipBrowserRedirect: false
       }
     })

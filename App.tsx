@@ -15,6 +15,18 @@ const AppContent: React.FC = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Set a timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      console.warn('Loading timeout - falling back to demo mode');
+      setUser({
+        uid: 'demo-user-123',
+        email: 'demo@editiq.com',
+        displayName: 'Demo User',
+        photoURL: 'https://i.pravatar.cc/150?u=demo'
+      });
+      setLoading(false);
+    }, 10000); // 10 second timeout
+
     // Handle auth redirect with better error handling and mobile compatibility
     const handleAuthRedirect = async () => {
       try {
@@ -30,47 +42,64 @@ const AppContent: React.FC = () => {
           }
         }
 
-        const { data, error } = await supabase.auth.getSession()
+        // Try to get session with timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 5000)
+        );
+
+        const { data, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        
         if (error) {
-          console.warn('Auth session error (this is normal for demo mode):', error.message)
+          console.warn('Auth session error (this is normal for demo mode):', error.message);
         }
-        if (data.session?.user) {
+        
+        if (data?.session?.user) {
           setUser({
             uid: data.session.user.id,
             email: data.session.user.email || '',
             displayName: data.session.user.user_metadata?.full_name || 'User',
             photoURL: data.session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
-          })
+          });
         }
+        
+        clearTimeout(loadingTimeout);
+        setLoading(false);
       } catch (error) {
-        console.warn('Session initialization error (this is normal for demo mode):', error)
+        console.warn('Session initialization error (falling back to demo mode):', error);
+        clearTimeout(loadingTimeout);
+        setLoading(false);
       }
-      setLoading(false)
     }
 
-    handleAuthRedirect()
+    handleAuthRedirect();
 
     // Listen for auth changes with error handling
     try {
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        console.log('Auth event:', event)
+        console.log('Auth event:', event);
         if (session?.user) {
           setUser({
             uid: session.user.id,
             email: session.user.email || '',
             displayName: session.user.user_metadata?.full_name || 'User',
             photoURL: session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
-          })
+          });
         } else {
-          setUser(null)
+          setUser(null);
         }
-        setLoading(false)
-      })
+        clearTimeout(loadingTimeout);
+        setLoading(false);
+      });
 
-      return () => subscription.unsubscribe()
+      return () => {
+        subscription.unsubscribe();
+        clearTimeout(loadingTimeout);
+      };
     } catch (error) {
-      console.warn('Auth state change listener error:', error)
-      setLoading(false)
+      console.warn('Auth state change listener error:', error);
+      clearTimeout(loadingTimeout);
+      setLoading(false);
     }
   }, [])
 
@@ -82,8 +111,10 @@ const AppContent: React.FC = () => {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const isWebView = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
       
-      // Use GitHub Pages URL for redirect
-      const redirectUrl = 'https://edit-iq.github.io/editiq-workshop/';
+      // Use appropriate URL based on environment
+      const redirectUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3000/' 
+        : 'https://edit-iq.github.io/editiq-workshop/';
       
       if (isMobile || isWebView) {
         // For mobile/WebView, use popup mode which works better
@@ -143,9 +174,23 @@ const AppContent: React.FC = () => {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_20px_#2563eb]"></div>
-        <p className="text-blue-500 font-black uppercase tracking-[0.3em] text-[10px] animate-pulse text-center px-4">
+        <p className="text-blue-500 font-black uppercase tracking-[0.3em] text-[10px] animate-pulse text-center px-4 mb-8">
           Connecting to Supabase...
         </p>
+        <button 
+          onClick={() => {
+            setUser({
+              uid: 'demo-user-123',
+              email: 'demo@editiq.com',
+              displayName: 'Demo User',
+              photoURL: 'https://i.pravatar.cc/150?u=demo'
+            });
+            setLoading(false);
+          }}
+          className="px-6 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors border border-slate-600"
+        >
+          Skip & Enter Demo Mode
+        </button>
       </div>
     )
   }
