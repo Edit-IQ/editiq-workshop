@@ -9,19 +9,102 @@ import WorkspacePage from './components/WorkspacePage'
 import { LayoutDashboard, Users, Receipt, BrainCircuit, Shield, LogOut, LogIn, ArrowRight, Briefcase } from 'lucide-react'
 import { UserProfile } from './types'
 
-const App: React.FC = () => {
+// Error Boundary Component
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('App Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-screen flex flex-col items-center justify-center bg-[#020617] text-white p-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
+            <p className="text-slate-400 mb-6">Please refresh the page to try again</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Skip auth redirect handling and go straight to demo mode for now
-    setLoading(false)
+    // Handle auth redirect
+    const handleAuthRedirect = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession()
+        if (error) {
+          console.error('Auth error:', error)
+        }
+        if (data.session?.user) {
+          setUser({
+            uid: data.session.user.id,
+            email: data.session.user.email || '',
+            displayName: data.session.user.user_metadata?.full_name || 'User',
+            photoURL: data.session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
+          })
+        }
+      } catch (error) {
+        console.error('Session error:', error)
+      }
+      setLoading(false)
+    }
+
+    handleAuthRedirect()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth event:', event, session)
+      if (session?.user) {
+        setUser({
+          uid: session.user.id,
+          email: session.user.email || '',
+          displayName: session.user.user_metadata?.full_name || 'User',
+          photoURL: session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
+        })
+      } else {
+        setUser(null)
+      }
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   const handleLogin = async () => {
-    // For now, just go to demo mode
-    handleDemoMode()
+    try {
+      const { error } = await signInWithGoogle()
+      if (error) {
+        console.error('Login error:', error)
+        alert('Login failed. You can use "Enter as Guest" to test the app.')
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      alert('Login failed. You can use "Enter as Guest" to test the app.')
+    }
   }
 
   const handleDemoMode = () => {
@@ -208,6 +291,14 @@ const App: React.FC = () => {
       </main>
     </div>
   )
+}
+
+const App: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
 }
 
 export default App

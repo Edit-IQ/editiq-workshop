@@ -1,34 +1,23 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Fallback to demo mode if environment variables are not available
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://demo.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'demo-key'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://djojknyjlgntormnwovy.supabase.co'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqb2prbmVqbGdudG9ybW53b3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY2Nzc0MjQsImV4cCI6MjA1MjI1MzQyNH0.2vhAL-dRxmvOECGmdr2Mcrg_2vhAL'
 
-// Create a mock client for demo mode
-const createMockClient = () => ({
-  auth: {
-    signInWithOAuth: () => Promise.resolve({ data: null, error: { message: 'Demo mode' } }),
-    signOut: () => Promise.resolve({ error: null }),
-    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-    getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-    onAuthStateChange: (callback: any) => {
-      // Return a mock subscription
-      return { data: { subscription: { unsubscribe: () => {} } } }
-    }
-  }
-})
-
-// Use mock client if no valid Supabase URL
-export const supabase = supabaseUrl.includes('demo') ? createMockClient() : createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Auth helpers
 export const signInWithGoogle = async () => {
   try {
-    // Always return demo mode error to force demo login
-    return { data: null, error: { message: 'Demo mode - use Enter as Guest' } }
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
+    })
+    return { data, error }
   } catch (error) {
-    console.error('Auth error:', error)
-    return { data: null, error: { message: 'Demo mode - use Enter as Guest' } }
+    console.error('Google auth error:', error)
+    return { data: null, error }
   }
 }
 

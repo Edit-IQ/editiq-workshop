@@ -105,114 +105,268 @@ export const supabaseDb = {
   },
 
   async deleteClient(userId: string, clientId: string): Promise<void> {
-    const { error } = await supabase
-      .from('clients')
-      .delete()
-      .eq('id', clientId)
-      .eq('userId', userId)
-    
-    if (error) throw error
+    if (this.shouldUseLocalStorage(userId)) {
+      const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+      const filtered = clients.filter((c: Client) => c.id !== clientId || c.userId !== userId);
+      localStorage.setItem('clients', JSON.stringify(filtered));
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId)
+        .eq('userId', userId);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error('Delete client failed:', error);
+      // Fallback to localStorage
+      const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+      const filtered = clients.filter((c: Client) => c.id !== clientId || c.userId !== userId);
+      localStorage.setItem('clients', JSON.stringify(filtered));
+    }
   },
 
   // Transactions
   async getTransactions(userId: string): Promise<Transaction[]> {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('userId', userId)
-      .order('date', { ascending: false })
-    
-    if (error) throw error
-    return data || []
+    if (this.shouldUseLocalStorage(userId)) {
+      const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      return transactions.filter((t: Transaction) => t.userId === userId);
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('userId', userId)
+        .order('date', { ascending: false });
+      
+      if (error) {
+        console.error('Supabase error, falling back to localStorage:', error);
+        const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+        return transactions.filter((t: Transaction) => t.userId === userId);
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Get transactions failed, using localStorage:', error);
+      const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      return transactions.filter((t: Transaction) => t.userId === userId);
+    }
   },
 
   subscribeToTransactions(userId: string, callback: (transactions: Transaction[]) => void) {
     // Initial fetch
-    this.getTransactions(userId).then(callback).catch(console.error)
+    this.getTransactions(userId).then(callback).catch(console.error);
     
-    // Real-time subscription
+    if (this.shouldUseLocalStorage(userId)) {
+      // For demo users, just poll localStorage
+      const interval = setInterval(() => {
+        this.getTransactions(userId).then(callback).catch(console.error);
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+    
+    // For real users, use Supabase real-time
     const subscription = supabase
       .channel('transactions')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'transactions', filter: `userId=eq.${userId}` },
         () => {
-          this.getTransactions(userId).then(callback).catch(console.error)
+          this.getTransactions(userId).then(callback).catch(console.error);
         }
       )
-      .subscribe()
+      .subscribe();
 
-    return () => subscription.unsubscribe()
+    return () => subscription.unsubscribe();
   },
 
   async addTransaction(userId: string, txData: Omit<Transaction, 'id' | 'userId'>): Promise<string> {
-    const { data, error } = await supabase
-      .from('transactions')
-      .insert([{ ...txData, userId }])
-      .select()
-      .single()
-    
-    if (error) throw error
-    return data.id
+    const newTx: Transaction = {
+      ...txData,
+      id: crypto.randomUUID(),
+      userId
+    };
+
+    if (this.shouldUseLocalStorage(userId)) {
+      const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      transactions.push(newTx);
+      localStorage.setItem('transactions', JSON.stringify(transactions));
+      console.log('Transaction saved to localStorage:', newTx);
+      return newTx.id;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert([{ ...newTx, id: undefined }]) // Let Supabase generate ID
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Supabase error, saving to localStorage:', error);
+        const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+        transactions.push(newTx);
+        localStorage.setItem('transactions', JSON.stringify(transactions));
+        return newTx.id;
+      }
+      
+      return data.id;
+    } catch (error) {
+      console.error('Add transaction failed, using localStorage:', error);
+      const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      transactions.push(newTx);
+      localStorage.setItem('transactions', JSON.stringify(transactions));
+      return newTx.id;
+    }
   },
 
   async deleteTransaction(userId: string, txId: string): Promise<void> {
-    const { error } = await supabase
-      .from('transactions')
-      .delete()
-      .eq('id', txId)
-      .eq('userId', userId)
-    
-    if (error) throw error
+    if (this.shouldUseLocalStorage(userId)) {
+      const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      const filtered = transactions.filter((t: Transaction) => t.id !== txId || t.userId !== userId);
+      localStorage.setItem('transactions', JSON.stringify(filtered));
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', txId)
+        .eq('userId', userId);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error('Delete transaction failed:', error);
+      // Fallback to localStorage
+      const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+      const filtered = transactions.filter((t: Transaction) => t.id !== txId || t.userId !== userId);
+      localStorage.setItem('transactions', JSON.stringify(filtered));
+    }
   },
 
   // Credentials
   async getCredentials(userId: string): Promise<Credential[]> {
-    const { data, error } = await supabase
-      .from('credentials')
-      .select('*')
-      .eq('userId', userId)
-      .order('createdAt', { ascending: false })
-    
-    if (error) throw error
-    return data || []
+    if (this.shouldUseLocalStorage(userId)) {
+      const credentials = JSON.parse(localStorage.getItem('credentials') || '[]');
+      return credentials.filter((c: Credential) => c.userId === userId);
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('credentials')
+        .select('*')
+        .eq('userId', userId)
+        .order('createdAt', { ascending: false });
+      
+      if (error) {
+        console.error('Supabase error, falling back to localStorage:', error);
+        const credentials = JSON.parse(localStorage.getItem('credentials') || '[]');
+        return credentials.filter((c: Credential) => c.userId === userId);
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Get credentials failed, using localStorage:', error);
+      const credentials = JSON.parse(localStorage.getItem('credentials') || '[]');
+      return credentials.filter((c: Credential) => c.userId === userId);
+    }
   },
 
   subscribeToCredentials(userId: string, callback: (credentials: Credential[]) => void) {
     // Initial fetch
-    this.getCredentials(userId).then(callback).catch(console.error)
+    this.getCredentials(userId).then(callback).catch(console.error);
     
-    // Real-time subscription
+    if (this.shouldUseLocalStorage(userId)) {
+      // For demo users, just poll localStorage
+      const interval = setInterval(() => {
+        this.getCredentials(userId).then(callback).catch(console.error);
+      }, 1000);
+      
+      return () => clearInterval(interval);
+    }
+    
+    // For real users, use Supabase real-time
     const subscription = supabase
       .channel('credentials')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'credentials', filter: `userId=eq.${userId}` },
         () => {
-          this.getCredentials(userId).then(callback).catch(console.error)
+          this.getCredentials(userId).then(callback).catch(console.error);
         }
       )
-      .subscribe()
+      .subscribe();
 
-    return () => subscription.unsubscribe()
+    return () => subscription.unsubscribe();
   },
 
   async addCredential(userId: string, credData: Omit<Credential, 'id' | 'userId' | 'createdAt'>): Promise<string> {
-    const { data, error } = await supabase
-      .from('credentials')
-      .insert([{ ...credData, userId, createdAt: Date.now() }])
-      .select()
-      .single()
-    
-    if (error) throw error
-    return data.id
+    const newCred: Credential = {
+      ...credData,
+      id: crypto.randomUUID(),
+      userId,
+      createdAt: Date.now()
+    };
+
+    if (this.shouldUseLocalStorage(userId)) {
+      const credentials = JSON.parse(localStorage.getItem('credentials') || '[]');
+      credentials.push(newCred);
+      localStorage.setItem('credentials', JSON.stringify(credentials));
+      console.log('Credential saved to localStorage:', newCred);
+      return newCred.id;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('credentials')
+        .insert([{ ...newCred, id: undefined }]) // Let Supabase generate ID
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Supabase error, saving to localStorage:', error);
+        const credentials = JSON.parse(localStorage.getItem('credentials') || '[]');
+        credentials.push(newCred);
+        localStorage.setItem('credentials', JSON.stringify(credentials));
+        return newCred.id;
+      }
+      
+      return data.id;
+    } catch (error) {
+      console.error('Add credential failed, using localStorage:', error);
+      const credentials = JSON.parse(localStorage.getItem('credentials') || '[]');
+      credentials.push(newCred);
+      localStorage.setItem('credentials', JSON.stringify(credentials));
+      return newCred.id;
+    }
   },
 
   async deleteCredential(userId: string, credId: string): Promise<void> {
-    const { error } = await supabase
-      .from('credentials')
-      .delete()
-      .eq('id', credId)
-      .eq('userId', userId)
-    
-    if (error) throw error
+    if (this.shouldUseLocalStorage(userId)) {
+      const credentials = JSON.parse(localStorage.getItem('credentials') || '[]');
+      const filtered = credentials.filter((c: Credential) => c.id !== credId || c.userId !== userId);
+      localStorage.setItem('credentials', JSON.stringify(filtered));
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('credentials')
+        .delete()
+        .eq('id', credId)
+        .eq('userId', userId);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error('Delete credential failed:', error);
+      // Fallback to localStorage
+      const credentials = JSON.parse(localStorage.getItem('credentials') || '[]');
+      const filtered = credentials.filter((c: Credential) => c.id !== credId || c.userId !== userId);
+      localStorage.setItem('credentials', JSON.stringify(filtered));
+    }
   }
 }
