@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { signInWithGoogle, signOut, onAuthStateChange } from './services/firebase'
+import { signInWithGoogle, signOut, onAuthStateChange, checkRedirectResult } from './services/firebase'
 import Dashboard from './components/Dashboard'
 import ClientsPage from './components/ClientsPage'
 import TransactionsPage from './components/TransactionsPage'
@@ -17,41 +17,75 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     
-    // Set up Firebase auth state listener
-    const unsubscribe = onAuthStateChange((user) => {
-      if (!mounted) return;
-      
-      if (user) {
-        console.log('✅ Firebase user authenticated:', user.email);
+    // Check for redirect result first
+    const handleRedirectResult = async () => {
+      const { user: redirectUser } = await checkRedirectResult();
+      if (redirectUser && mounted) {
+        console.log('✅ Redirect authentication successful:', redirectUser.email);
         setUser({
-          uid: user.uid,
-          email: user.email || '',
-          displayName: user.displayName || 'User',
-          photoURL: user.photoURL || 'https://i.pravatar.cc/150'
+          uid: redirectUser.uid,
+          email: redirectUser.email || '',
+          displayName: redirectUser.displayName || 'User',
+          photoURL: redirectUser.photoURL || 'https://i.pravatar.cc/150'
         });
-      } else {
-        console.log('🚪 No Firebase user');
-        setUser(null);
+        setLoading(false);
+        return;
       }
       
-      setLoading(false);
-    });
+      // Set up Firebase auth state listener
+      const unsubscribe = onAuthStateChange((user) => {
+        if (!mounted) return;
+        
+        if (user) {
+          console.log('✅ Firebase user authenticated:', user.email);
+          setUser({
+            uid: user.uid,
+            email: user.email || '',
+            displayName: user.displayName || 'User',
+            photoURL: user.photoURL || 'https://i.pravatar.cc/150'
+          });
+        } else {
+          console.log('🚪 No Firebase user');
+          setUser(null);
+        }
+        
+        setLoading(false);
+      });
 
-    // Cleanup
-    return () => {
-      mounted = false;
-      unsubscribe();
+      // Cleanup
+      return () => {
+        mounted = false;
+        unsubscribe();
+      };
     };
+    
+    handleRedirectResult();
   }, [])
 
   const handleLogin = async () => {
     try {
-      console.log('Starting Firebase Google login...')
+      console.log('🔐 Starting Firebase Google login...')
+      setLoading(true)
+      
       const { user, error } = await signInWithGoogle()
       
       if (error) {
-        console.error('Firebase login error:', error)
-        alert(`Login failed: ${error.message}. Please try again or use "Enter as Guest".`)
+        console.error('❌ Firebase login error:', error)
+        
+        // Provide helpful error messages
+        let errorMessage = 'Login failed. ';
+        if (error.code === 'auth/popup-blocked') {
+          errorMessage += 'Popup was blocked. Please allow popups for this site and try again.';
+        } else if (error.code === 'auth/network-request-failed') {
+          errorMessage += 'Network error. Please check your internet connection.';
+        } else if (error.message?.includes('CORS')) {
+          errorMessage += 'Browser security issue. Try using "Enter as Guest" instead.';
+        } else {
+          errorMessage += error.message || 'Please try again or use "Enter as Guest".';
+        }
+        
+        alert(errorMessage)
+        setLoading(false)
         return
       }
       
@@ -61,18 +95,21 @@ const AppContent: React.FC = () => {
       }
       
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('❌ Login error:', error)
       alert('Login failed. Please try again or use "Enter as Guest".')
+      setLoading(false)
     }
   }
 
   const handleDemoMode = () => {
+    console.log('🎭 Entering demo mode...')
     setUser({
       uid: 'demo-user-123',
       email: 'demo@editiq.com',
       displayName: 'Demo User',
       photoURL: 'https://i.pravatar.cc/150?u=demo'
     })
+    setLoading(false)
   }
 
   const handleLogout = async () => {
@@ -85,7 +122,7 @@ const AppContent: React.FC = () => {
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_20px_#2563eb]"></div>
         <p className="text-blue-500 font-black uppercase tracking-[0.3em] text-[10px] animate-pulse text-center px-4 mb-8">
-          Connecting to Supabase...
+          Connecting to Firebase...
         </p>
         <button 
           onClick={() => {
@@ -142,7 +179,7 @@ const AppContent: React.FC = () => {
           <div className="mt-12 flex items-center justify-center gap-3">
             <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-              Supabase Ready
+              Firebase Ready
             </span>
           </div>
         </div>

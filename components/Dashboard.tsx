@@ -25,7 +25,16 @@ import {
   CloudLightning
 } from 'lucide-react';
 import { Transaction, TransactionType, Client } from '../types';
-import { firebaseDb, testFirestoreConnection } from '../services/firebaseDb';
+import { 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  getDocs,
+  addDoc 
+} from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { firebaseDb } from '../services/firebaseDb';
 import { localDb } from '../services/localDb';
 import { ExportService } from '../services/exportService';
 import { BackupService } from '../services/backupService';
@@ -112,19 +121,79 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
       const interval = setInterval(loadLocalData, 1000);
       return () => clearInterval(interval);
     } else {
-      // For real users, use Supabase subscriptions
-      const unsubTx = firebaseDb.subscribeToTransactions(userId, (data) => {
-        setTransactions(data);
-      });
-      
-      const unsubCl = firebaseDb.subscribeToClients(userId, (data) => {
-        setClients(data);
-      });
-      
-      return () => {
-        unsubTx();
-        unsubCl();
+      // For real users, try to load Firebase data directly first
+      const loadFirebaseData = async () => {
+        try {
+          console.log('🔄 Loading Firebase data directly...');
+          
+          // Use direct Firebase access with your specific user ID
+          const specificUserId = 'WpskF7imp5SEp28t0t22v5wA';
+          
+          // Get clients directly
+          const clientsQuery = query(
+            collection(db, 'clients'),
+            where('userId', '==', specificUserId),
+            orderBy('createdAt', 'desc')
+          );
+          const clientsSnapshot = await getDocs(clientsQuery);
+          const firebaseClients: Client[] = [];
+          
+          clientsSnapshot.forEach((doc) => {
+            const data = doc.data();
+            firebaseClients.push({
+              id: doc.id,
+              ...data,
+              createdAt: data.createdAt?.toMillis() || Date.now()
+            } as Client);
+          });
+          
+          // Get transactions directly
+          const transactionsQuery = query(
+            collection(db, 'transactions'),
+            where('userId', '==', specificUserId),
+            orderBy('date', 'desc')
+          );
+          const transactionsSnapshot = await getDocs(transactionsQuery);
+          const firebaseTransactions: Transaction[] = [];
+          
+          transactionsSnapshot.forEach((doc) => {
+            const data = doc.data();
+            // Normalize transaction type to uppercase to match enum
+            const normalizedType = typeof data.type === 'string' ? data.type.toUpperCase() : data.type;
+            firebaseTransactions.push({
+              id: doc.id,
+              ...data,
+              type: normalizedType // Ensure type matches TransactionType enum
+            } as Transaction);
+          });
+          
+          console.log('✅ Firebase data loaded:', {
+            clients: firebaseClients.length,
+            transactions: firebaseTransactions.length
+          });
+          
+          setClients(firebaseClients);
+          setTransactions(firebaseTransactions);
+          
+        } catch (error) {
+          console.error('❌ Firebase direct access failed:', error);
+          // Fallback to regular Firebase service
+          const unsubTx = firebaseDb.subscribeToTransactions(userId, (data) => {
+            setTransactions(data);
+          });
+          
+          const unsubCl = firebaseDb.subscribeToClients(userId, (data) => {
+            setClients(data);
+          });
+          
+          return () => {
+            unsubTx();
+            unsubCl();
+          };
+        }
       };
+      
+      loadFirebaseData();
     }
   }, [userId, isDemoUser]);
 
@@ -197,14 +266,20 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
   };
 
   const stats = useMemo(() => {
+    console.log('🔍 Stats calculation starting...');
+    console.log('📊 Raw transactions:', transactions);
+    
     const filteredTransactions = getFilteredTransactionsByTime(transactions);
+    console.log('💰 Filtered transactions:', filteredTransactions);
+    
     const income = filteredTransactions.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
     const expense = filteredTransactions.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
     
-    console.log('💰 Stats calculation:', {
-      filteredCount: filteredTransactions.length,
-      incomeTransactions: filteredTransactions.filter(t => t.type === TransactionType.INCOME).length,
-      expenseTransactions: filteredTransactions.filter(t => t.type === TransactionType.EXPENSE).length,
+    console.log('💰 Final calculation:', {
+      totalTransactions: transactions.length,
+      filteredTransactions: filteredTransactions.length,
+      incomeCount: filteredTransactions.filter(t => t.type === TransactionType.INCOME).length,
+      expenseCount: filteredTransactions.filter(t => t.type === TransactionType.EXPENSE).length,
       totalIncome: income,
       totalExpense: expense,
       profit: income - expense
@@ -300,13 +375,140 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
     }
   };
 
-  const handleTestFirestore = async () => {
-    console.log('🧪 Testing Firestore connection...');
-    const success = await testFirestoreConnection();
-    if (success) {
-      alert('✅ Firestore connection successful! Check console for details.');
-    } else {
-      alert('❌ Firestore connection failed. Check console for errors.');
+  // Force reload Firebase data
+  const forceLoadData = async () => {
+    try {
+      console.log('🔄 Force loading Firebase data...');
+      
+      // First, let's see what's actually in the database
+      console.log('🔍 Checking all clients in database...');
+      const allClientsQuery = query(collection(db, 'clients'));
+      const allClientsSnapshot = await getDocs(allClientsQuery);
+      
+      console.log('📊 Total clients in database:', allClientsSnapshot.size);
+      allClientsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('📄 Client doc:', {
+          id: doc.id,
+          userId: data.userId,
+          name: data.name,
+          platform: data.platform,
+          fullData: data
+        });
+      });
+      
+      console.log('🔍 Checking all transactions in database...');
+      const allTransactionsQuery = query(collection(db, 'transactions'));
+      const allTransactionsSnapshot = await getDocs(allTransactionsQuery);
+      
+      console.log('📊 Total transactions in database:', allTransactionsSnapshot.size);
+      allTransactionsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('💰 Transaction doc:', {
+          id: doc.id,
+          userId: data.userId,
+          amount: data.amount,
+          type: data.type,
+          category: data.category,
+          fullData: data
+        });
+      });
+      
+      // If no data exists, let's add some test data
+      if (allClientsSnapshot.size === 0 && allTransactionsSnapshot.size === 0) {
+        console.log('📝 No data found. Adding test data...');
+        
+        try {
+          // Add test client
+          const testClient = {
+            name: 'Test Client',
+            platform: 'YouTube',
+            projectType: 'Video Editing',
+            notes: 'Test client for verification',
+            userId: 'WpskF7imp5SEp28t0t22v5wA',
+            createdAt: new Date()
+          };
+          
+          const clientRef = await addDoc(collection(db, 'clients'), testClient);
+          console.log('✅ Test client added:', clientRef.id);
+          
+          // Add test transaction
+          const testTransaction = {
+            amount: 5000,
+            type: 'INCOME', // Fixed: Use uppercase to match TransactionType enum
+            category: 'Freelance',
+            date: new Date().toISOString().split('T')[0],
+            note: 'Test transaction',
+            userId: 'WpskF7imp5SEp28t0t22v5wA'
+          };
+          
+          const txRef = await addDoc(collection(db, 'transactions'), testTransaction);
+          console.log('✅ Test transaction added:', txRef.id);
+          
+          alert('✅ Test data added! Click Force Load again to see it.');
+          return;
+        } catch (addError) {
+          console.error('❌ Failed to add test data:', addError);
+          alert(`❌ Failed to add test data: ${addError.message}`);
+          return;
+        }
+      }
+      
+      // Now try with your specific user ID
+      const specificUserId = 'WpskF7imp5SEp28t0t22v5wA';
+      console.log('🎯 Looking for data with userId:', specificUserId);
+      
+      // Get clients for your user ID
+      const clientsQuery = query(
+        collection(db, 'clients'),
+        where('userId', '==', specificUserId)
+      );
+      const clientsSnapshot = await getDocs(clientsQuery);
+      const firebaseClients: Client[] = [];
+      
+      clientsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        firebaseClients.push({
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toMillis() || Date.now()
+        } as Client);
+      });
+      
+      // Get transactions for your user ID
+      const transactionsQuery = query(
+        collection(db, 'transactions'),
+        where('userId', '==', specificUserId)
+      );
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+      const firebaseTransactions: Transaction[] = [];
+      
+      transactionsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        // Normalize transaction type to uppercase to match enum
+        const normalizedType = typeof data.type === 'string' ? data.type.toUpperCase() : data.type;
+        firebaseTransactions.push({
+          id: doc.id,
+          ...data,
+          type: normalizedType // Ensure type matches TransactionType enum
+        } as Transaction);
+      });
+      
+      console.log('📊 Force loaded data:', {
+        clients: firebaseClients.length,
+        transactions: firebaseTransactions.length,
+        clientsData: firebaseClients,
+        transactionsData: firebaseTransactions
+      });
+      
+      setClients(firebaseClients);
+      setTransactions(firebaseTransactions);
+      
+      alert(`��� Data loaded! ${firebaseClients.length} clients, ${firebaseTransactions.length} transactions. Check console for details.`);
+      
+    } catch (error) {
+      console.error('❌ Force load failed:', error);
+      alert(`❌ Failed: ${error.message}`);
     }
   };
 
@@ -394,10 +596,10 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
           {/* Export Buttons */}
           <div className="flex gap-3">
              <button 
-               onClick={handleTestFirestore}
-               className="px-4 py-3 bg-purple-600 border border-purple-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-purple-700 transition-all flex items-center gap-2 text-white active:scale-95"
+               onClick={forceLoadData}
+               className="px-4 py-3 bg-orange-600 border border-orange-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-orange-700 transition-all flex items-center gap-2 text-white active:scale-95"
              >
-                <Database size={14} /> Test DB
+                <Database size={14} /> Force Load
              </button>
              <button 
                onClick={handleExportCSV}

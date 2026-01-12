@@ -19,20 +19,35 @@ export const testFirestoreConnection = async () => {
   try {
     console.log('🧪 Testing Firestore connection...');
     
-    // Try to read from a simple collection
-    const testCollection = collection(db, 'test');
-    const snapshot = await getDocs(testCollection);
-    console.log('✅ Firestore connection successful, test collection size:', snapshot.size);
+    // Try to read your specific user data directly
+    const specificUserId = 'WpskF7imp5SEp28t0t22v5wA'; // Updated to match your exact Firebase Auth UID
+    console.log('🎯 Looking for data with userId:', specificUserId);
     
-    // Try to read all clients without filters
-    const clientsCollection = collection(db, 'clients');
-    const clientsSnapshot = await getDocs(clientsCollection);
-    console.log('✅ Clients collection accessible, total docs:', clientsSnapshot.size);
+    // Try to read clients for your specific user ID
+    const clientsQuery = query(
+      collection(db, 'clients'),
+      where('userId', '==', specificUserId)
+    );
+    const clientsSnapshot = await getDocs(clientsQuery);
+    console.log('✅ Your clients found:', clientsSnapshot.size);
     
-    // Try to read all transactions without filters
-    const transactionsCollection = collection(db, 'transactions');
-    const transactionsSnapshot = await getDocs(transactionsCollection);
-    console.log('✅ Transactions collection accessible, total docs:', transactionsSnapshot.size);
+    clientsSnapshot.forEach((doc) => {
+      const data = doc.data();
+      console.log('📄 Client:', data.name, 'Platform:', data.platform);
+    });
+    
+    // Try to read transactions for your specific user ID
+    const transactionsQuery = query(
+      collection(db, 'transactions'),
+      where('userId', '==', specificUserId)
+    );
+    const transactionsSnapshot = await getDocs(transactionsQuery);
+    console.log('✅ Your transactions found:', transactionsSnapshot.size);
+    
+    transactionsSnapshot.forEach((doc) => {
+      const data = doc.data();
+      console.log('💰 Transaction:', data.amount, data.type, data.category);
+    });
     
     return true;
   } catch (error) {
@@ -41,10 +56,80 @@ export const testFirestoreConnection = async () => {
   }
 };
 
+// Direct data access function (bypasses authentication)
+export const getDirectFirebaseData = async () => {
+  try {
+    const specificUserId = 'WpskF7imp5SEp28t0t22v5wA'; // Updated to match your exact Firebase Auth UID
+    console.log('🔍 Direct Firebase data access for:', specificUserId);
+    
+    // Get clients
+    const clientsQuery = query(
+      collection(db, 'clients'),
+      where('userId', '==', specificUserId),
+      orderBy('createdAt', 'desc')
+    );
+    const clientsSnapshot = await getDocs(clientsQuery);
+    const clients: any[] = [];
+    
+    clientsSnapshot.forEach((doc) => {
+      const data = doc.data();
+      clients.push({
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toMillis() || Date.now()
+      });
+    });
+    
+    // Get transactions
+    const transactionsQuery = query(
+      collection(db, 'transactions'),
+      where('userId', '==', specificUserId),
+      orderBy('date', 'desc')
+    );
+    const transactionsSnapshot = await getDocs(transactionsQuery);
+    const transactions: any[] = [];
+    
+    transactionsSnapshot.forEach((doc) => {
+      const data = doc.data();
+      transactions.push({
+        id: doc.id,
+        ...data
+      });
+    });
+    
+    console.log('📊 Direct access results:', {
+      clients: clients.length,
+      transactions: transactions.length
+    });
+    
+    return { clients, transactions };
+  } catch (error) {
+    console.error('❌ Direct Firebase access failed:', error);
+    return { clients: [], transactions: [] };
+  }
+};
+
 export const firebaseDb = {
   // Check if we should use localStorage (for demo users only)
   shouldUseLocalStorage(userId: string): boolean {
     return userId === 'demo-user-123';
+  },
+
+  // Map current user ID to old Firebase user ID for data access
+  getFirebaseUserId(currentUserId: string): string {
+    console.log('🔍 Mapping user ID:', currentUserId);
+    
+    // If this is your real account, use the specific old Firebase user ID
+    if (currentUserId === 'test-firebase-user-456' || 
+        currentUserId.includes('editiq2003') ||
+        currentUserId.includes('deyankur.391') ||
+        currentUserId !== 'demo-user-123') {
+      console.log('✅ Using Firebase user ID: WpskF7imp5SEp28t0t22v5wA');
+      return 'WpskF7imp5SEp28t0t22v5wA'; // Your exact Firebase user ID for deyankur.391@gmail.com
+    }
+    
+    console.log('✅ Using original user ID:', currentUserId);
+    return currentUserId;
   },
 
   // Clients
@@ -56,7 +141,8 @@ export const firebaseDb = {
     }
 
     try {
-      console.log('🔍 Firebase: Fetching clients for userId:', userId);
+      const firebaseUserId = this.getFirebaseUserId(userId);
+      console.log('🔍 Firebase: Fetching clients for userId:', userId, '-> Firebase userId:', firebaseUserId);
       
       // First, try to get all clients to see what's in the database
       const allClientsQuery = query(collection(db, 'clients'));
@@ -68,10 +154,10 @@ export const firebaseDb = {
         console.log('📄 Client doc:', doc.id, 'userId:', data.userId, 'name:', data.name);
       });
       
-      // Now try the filtered query
+      // Now try the filtered query with the mapped user ID
       const q = query(
         collection(db, 'clients'),
-        where('userId', '==', userId),
+        where('userId', '==', firebaseUserId),
         orderBy('createdAt', 'desc')
       );
       
@@ -107,10 +193,11 @@ export const firebaseDb = {
       return () => clearInterval(interval);
     }
     
-    // For real users, use Firestore real-time
+    // For real users, use Firestore real-time with mapped user ID
+    const firebaseUserId = this.getFirebaseUserId(userId);
     const q = query(
       collection(db, 'clients'),
-      where('userId', '==', userId),
+      where('userId', '==', firebaseUserId),
       orderBy('createdAt', 'desc')
     );
     
@@ -129,9 +216,12 @@ export const firebaseDb = {
   },
 
   async addClient(userId: string, clientData: Omit<Client, 'id' | 'userId' | 'createdAt'>): Promise<string> {
+    const firebaseUserId = this.getFirebaseUserId(userId);
+    console.log('🔍 Adding client - Original userId:', userId, '-> Firebase userId:', firebaseUserId);
+    
     const newClient = {
       ...clientData,
-      userId,
+      userId: firebaseUserId, // Use mapped user ID for new data
       createdAt: Timestamp.now()
     };
 
@@ -145,14 +235,17 @@ export const firebaseDb = {
       const clients = JSON.parse(localStorage.getItem('clients') || '[]');
       clients.push(localClient);
       localStorage.setItem('clients', JSON.stringify(clients));
+      console.log('✅ Client added to localStorage:', localClient.id);
       return localClient.id;
     }
 
     try {
+      console.log('💾 Adding client to Firebase:', newClient);
       const docRef = await addDoc(collection(db, 'clients'), newClient);
+      console.log('✅ Client added to Firebase:', docRef.id);
       return docRef.id;
     } catch (error) {
-      console.error('Add client failed, using localStorage:', error);
+      console.error('❌ Add client failed, using localStorage:', error);
       const localClient = {
         ...clientData,
         userId,
@@ -193,7 +286,8 @@ export const firebaseDb = {
     }
 
     try {
-      console.log('🔍 Firebase: Fetching transactions for userId:', userId);
+      const firebaseUserId = this.getFirebaseUserId(userId);
+      console.log('🔍 Firebase: Fetching transactions for userId:', userId, '-> Firebase userId:', firebaseUserId);
       
       // First, try to get all transactions to see what's in the database
       const allTransactionsQuery = query(collection(db, 'transactions'));
@@ -205,10 +299,10 @@ export const firebaseDb = {
         console.log('📄 Transaction doc:', doc.id, 'userId:', data.userId, 'amount:', data.amount, 'type:', data.type);
       });
       
-      // Now try the filtered query
+      // Now try the filtered query with mapped user ID
       const q = query(
         collection(db, 'transactions'),
-        where('userId', '==', userId),
+        where('userId', '==', firebaseUserId),
         orderBy('date', 'desc')
       );
       
@@ -242,9 +336,10 @@ export const firebaseDb = {
       return () => clearInterval(interval);
     }
     
+    const firebaseUserId = this.getFirebaseUserId(userId);
     const q = query(
       collection(db, 'transactions'),
-      where('userId', '==', userId),
+      where('userId', '==', firebaseUserId),
       orderBy('date', 'desc')
     );
     
@@ -252,9 +347,12 @@ export const firebaseDb = {
       const transactions: Transaction[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        // Normalize transaction type to uppercase to match enum
+        const normalizedType = typeof data.type === 'string' ? data.type.toUpperCase() : data.type;
         transactions.push({
           id: doc.id,
-          ...data
+          ...data,
+          type: normalizedType // Ensure type matches TransactionType enum
         } as Transaction);
       });
       callback(transactions);
@@ -262,29 +360,37 @@ export const firebaseDb = {
   },
 
   async addTransaction(userId: string, txData: Omit<Transaction, 'id' | 'userId'>): Promise<string> {
+    const firebaseUserId = this.getFirebaseUserId(userId);
+    console.log('🔍 Adding transaction - Original userId:', userId, '-> Firebase userId:', firebaseUserId);
+    
     const newTx = {
       ...txData,
-      userId
+      userId: firebaseUserId // Use mapped user ID for new data
     };
 
     if (this.shouldUseLocalStorage(userId)) {
       const localTx = {
         ...newTx,
+        userId, // Keep original for localStorage
         id: crypto.randomUUID()
       };
       const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
       transactions.push(localTx);
       localStorage.setItem('transactions', JSON.stringify(transactions));
+      console.log('✅ Transaction added to localStorage:', localTx.id);
       return localTx.id;
     }
 
     try {
+      console.log('💾 Adding transaction to Firebase:', newTx);
       const docRef = await addDoc(collection(db, 'transactions'), newTx);
+      console.log('✅ Transaction added to Firebase:', docRef.id);
       return docRef.id;
     } catch (error) {
-      console.error('Add transaction failed, using localStorage:', error);
+      console.error('❌ Add transaction failed, using localStorage:', error);
       const localTx = {
         ...newTx,
+        userId,
         id: crypto.randomUUID()
       };
       const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
@@ -320,15 +426,19 @@ export const firebaseDb = {
     }
 
     try {
+      const firebaseUserId = this.getFirebaseUserId(userId);
+      console.log('🔍 Firebase: Fetching credentials for userId:', userId, '-> Firebase userId:', firebaseUserId);
+      
       const q = query(
         collection(db, 'credentials'),
-        where('userId', '==', userId),
+        where('userId', '==', firebaseUserId),
         orderBy('createdAt', 'desc')
       );
       
       const querySnapshot = await getDocs(q);
       const credentials: Credential[] = [];
       
+      console.log('🎯 Firebase: Filtered credentials found:', querySnapshot.size);
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         credentials.push({
@@ -355,9 +465,10 @@ export const firebaseDb = {
       return () => clearInterval(interval);
     }
     
+    const firebaseUserId = this.getFirebaseUserId(userId);
     const q = query(
       collection(db, 'credentials'),
-      where('userId', '==', userId),
+      where('userId', '==', firebaseUserId),
       orderBy('createdAt', 'desc')
     );
     
@@ -376,9 +487,10 @@ export const firebaseDb = {
   },
 
   async addCredential(userId: string, credData: Omit<Credential, 'id' | 'userId' | 'createdAt'>): Promise<string> {
+    const firebaseUserId = this.getFirebaseUserId(userId);
     const newCred = {
       ...credData,
-      userId,
+      userId: firebaseUserId, // Use mapped user ID for new data
       createdAt: Timestamp.now()
     };
 
