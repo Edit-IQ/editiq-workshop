@@ -20,7 +20,7 @@ export const testFirestoreConnection = async () => {
     console.log('🧪 Testing Firestore connection...');
     
     // Try to read your specific user data directly
-    const specificUserId = 'WpskF7imp5SEp28t0t22v5wA'; // Updated to match your exact Firebase Auth UID
+    const specificUserId = 'WpskF7imp5SEp28t0t22v5wAhQT2'; // Fixed: Your actual Firebase user ID
     console.log('🎯 Looking for data with userId:', specificUserId);
     
     // Try to read clients for your specific user ID
@@ -59,7 +59,7 @@ export const testFirestoreConnection = async () => {
 // Direct data access function (bypasses authentication)
 export const getDirectFirebaseData = async () => {
   try {
-    const specificUserId = 'WpskF7imp5SEp28t0t22v5wA'; // Updated to match your exact Firebase Auth UID
+    const specificUserId = 'WpskF7imp5SEp28t0t22v5wAhQT2'; // Fixed: Your actual Firebase user ID
     console.log('🔍 Direct Firebase data access for:', specificUserId);
     
     // Get clients
@@ -122,8 +122,8 @@ export const firebaseDb = {
     // Only map to your specific old data if it's your exact account
     if (currentUserId === 'test-firebase-user-456' || 
         currentUserId.includes('deyankur.391@gmail.com')) {
-      console.log('✅ Using your old Firebase user ID: WpskF7imp5SEp28t0t22v5wA');
-      return 'WpskF7imp5SEp28t0t22v5wA'; // Your specific Firebase user ID for deyankur.391@gmail.com
+      console.log('✅ Using your old Firebase user ID: WpskF7imp5SEp28t0t22v5wAhQT2');
+      return 'WpskF7imp5SEp28t0t22v5wAhQT2'; // Your actual Firebase user ID (with hQT2)
     }
     
     // For all other users, use their actual user ID (separate data)

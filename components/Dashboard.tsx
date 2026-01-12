@@ -22,7 +22,8 @@ import {
   Database,
   CheckCircle,
   X as CloseIcon,
-  CloudLightning
+  CloudLightning,
+  Users
 } from 'lucide-react';
 import { Transaction, TransactionType, Client } from '../types';
 import { 
@@ -419,7 +420,7 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
         console.log('📝 No data found. Adding test data...');
         
         try {
-          // Add test client
+          // Add test client first
           const testClient = {
             name: 'Test Client',
             platform: 'YouTube',
@@ -439,7 +440,8 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
             category: 'Freelance',
             date: new Date().toISOString().split('T')[0],
             note: 'Test transaction',
-            userId: 'WpskF7imp5SEp28t0t22v5wA'
+            userId: 'WpskF7imp5SEp28t0t22v5wA',
+            clientId: clientRef.id // Link to the client
           };
           
           const txRef = await addDoc(collection(db, 'transactions'), testTransaction);
@@ -454,8 +456,46 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
         }
       }
       
-      // Now try with your specific user ID
-      const specificUserId = 'WpskF7imp5SEp28t0t22v5wA';
+      // If we have transactions but no clients, add some clients
+      if (allClientsSnapshot.size === 0 && allTransactionsSnapshot.size > 0) {
+        console.log('📝 Found transactions but no clients. Adding sample clients...');
+        
+        try {
+          const sampleClients = [
+            {
+              name: 'YouTube Creator',
+              platform: 'YouTube',
+              projectType: 'Video Editing',
+              notes: 'Regular video editing client',
+              userId: 'WpskF7imp5SEp28t0t22v5wA',
+              createdAt: new Date()
+            },
+            {
+              name: 'Instagram Influencer',
+              platform: 'Instagram',
+              projectType: 'Graphic Design',
+              notes: 'Social media content creation',
+              userId: 'WpskF7imp5SEp28t0t22v5wA',
+              createdAt: new Date()
+            }
+          ];
+          
+          for (const client of sampleClients) {
+            const clientRef = await addDoc(collection(db, 'clients'), client);
+            console.log('✅ Sample client added:', client.name, clientRef.id);
+          }
+          
+          alert('✅ Sample clients added! Refresh to see them.');
+          return;
+        } catch (addError) {
+          console.error('❌ Failed to add sample clients:', addError);
+          alert(`❌ Failed to add clients: ${addError.message}`);
+          return;
+        }
+      }
+      
+      // Now try with your specific user ID (corrected)
+      const specificUserId = 'WpskF7imp5SEp28t0t22v5wAhQT2'; // Fixed: Added missing hQT2
       console.log('🎯 Looking for data with userId:', specificUserId);
       
       // Get clients for your user ID
@@ -600,6 +640,29 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
                className="px-4 py-3 bg-orange-600 border border-orange-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-orange-700 transition-all flex items-center gap-2 text-white active:scale-95"
              >
                 <Database size={14} /> Force Load
+             </button>
+             <button 
+               onClick={() => {
+                 // Add sample clients directly
+                 const addClients = async () => {
+                   try {
+                     const sampleClients = [
+                       { name: 'YouTube Creator', platform: 'YouTube', projectType: 'Video Editing', notes: 'Video editing client', userId: 'WpskF7imp5SEp28t0t22v5wAhQT2', createdAt: new Date() },
+                       { name: 'Instagram Influencer', platform: 'Instagram', projectType: 'Graphic Design', notes: 'Social media content', userId: 'WpskF7imp5SEp28t0t22v5wAhQT2', createdAt: new Date() }
+                     ];
+                     for (const client of sampleClients) {
+                       await addDoc(collection(db, 'clients'), client);
+                     }
+                     alert('✅ Sample clients added! Go to Clients page to see them.');
+                   } catch (error) {
+                     alert(`❌ Failed: ${error.message}`);
+                   }
+                 };
+                 addClients();
+               }}
+               className="px-4 py-3 bg-purple-600 border border-purple-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-purple-700 transition-all flex items-center gap-2 text-white active:scale-95"
+             >
+                <Users size={14} /> Add Clients
              </button>
              <button 
                onClick={handleExportCSV}

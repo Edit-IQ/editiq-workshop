@@ -61,7 +61,8 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      console.log('🔄 Loading clients and transactions...');
+      console.log('🔄 ClientsPage: Loading clients and transactions for userId:', userId);
+      console.log('🔍 ClientsPage: Is demo user:', isDemoUser);
       
       let cls: Client[], txs: Transaction[];
       
@@ -70,6 +71,7 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
         cls = localDb.getClients(userId);
         txs = localDb.getTransactions(userId);
       } else {
+        console.log('🔥 ClientsPage: Using Firebase for real user');
         const [clsData, txsData] = await Promise.all([
           firebaseDb.getClients(userId),
           firebaseDb.getTransactions(userId)
@@ -78,7 +80,8 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
         txs = txsData;
       }
       
-      console.log('📊 Loaded data:', {
+      console.log('📊 ClientsPage: Loaded data:', {
+        userId: userId,
         clients: cls.length,
         transactions: txs.length,
         clientsData: cls,
@@ -88,7 +91,7 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
       setClients(cls);
       setTransactions(txs);
     } catch (error) {
-      console.error('❌ Failed to load data:', error);
+      console.error('❌ ClientsPage: Failed to load data:', error);
     } finally {
       setIsLoading(false);
     }
