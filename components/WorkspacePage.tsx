@@ -9,7 +9,7 @@ import {
   X as CloseIcon
 } from 'lucide-react';
 import { Client } from '../types';
-import { supabaseDb } from '../services/supabaseDb';
+import { firebaseDb } from '../services/firebaseDb';
 
 interface WorkspacePageProps {
   userId: string;
@@ -57,7 +57,7 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
   const loadData = async () => {
     const [tasksData, clientsData] = await Promise.all([
       getTasksFromStorage(),
-      supabaseDb.getClients(userId)
+      firebaseDb.getClients(userId)
     ]);
     setTasks(tasksData);
     setClients(clientsData);

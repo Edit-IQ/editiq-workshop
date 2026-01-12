@@ -14,7 +14,7 @@ import {
   Lock
 } from 'lucide-react';
 import { Credential } from '../types';
-import { supabaseDb } from '../services/supabaseDb';
+import { firebaseDb } from '../services/firebaseDb';
 import { localDb } from '../services/localDb';
 
 interface CredentialsPageProps {
@@ -42,7 +42,7 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ userId }) => {
       if (isDemoUser) {
         data = localDb.getCredentials(userId);
       } else {
-        data = await supabaseDb.getCredentials(userId);
+        data = await firebaseDb.getCredentials(userId);
       }
       setCredentials(data);
     } catch (error) {
@@ -71,7 +71,7 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ userId }) => {
       if (isDemoUser) {
         localDb.addCredential(userId, newCred);
       } else {
-        await supabaseDb.addCredential(userId, newCred);
+        await firebaseDb.addCredential(userId, newCred);
       }
       
       setNewCred({ platformName: '', loginName: '', password: '', notes: '' });
@@ -89,7 +89,7 @@ const CredentialsPage: React.FC<CredentialsPageProps> = ({ userId }) => {
         if (isDemoUser) {
           localDb.deleteCredential(userId, id);
         } else {
-          await supabaseDb.deleteCredential(userId, id);
+          await firebaseDb.deleteCredential(userId, id);
         }
         loadData();
       } catch (error) {

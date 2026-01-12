@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { supabase, signInWithGoogle, signOut } from './services/supabase'
+import { signInWithGoogle, signOut, onAuthStateChange } from './services/firebase'
 import Dashboard from './components/Dashboard'
 import ClientsPage from './components/ClientsPage'
 import TransactionsPage from './components/TransactionsPage'
@@ -17,148 +17,47 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     
-    const handleAuth = async () => {
-      try {
-        // Check for auth tokens in URL
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        
-        if (accessToken) {
-          console.log('Found access token, cleaning URL and waiting for session...');
-          // Clean URL immediately
-          window.history.replaceState(null, '', window.location.pathname);
-          
-          // Wait for Supabase to process the authentication
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        // Get current session
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.warn('Session error:', error.message);
-        }
-        
-        if (session?.user && mounted) {
-          console.log('✅ User authenticated:', session.user.email);
-          setUser({
-            uid: session.user.id,
-            email: session.user.email || '',
-            displayName: session.user.user_metadata?.full_name || 'User',
-            photoURL: session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
-          });
-          setLoading(false);
-          return;
-        }
-        
-        // If we had a token but no session, wait a bit more
-        if (accessToken && !session && mounted) {
-          console.log('Retrying session after token processing...');
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          
-          const { data: { session: retrySession } } = await supabase.auth.getSession();
-          if (retrySession?.user && mounted) {
-            console.log('✅ User authenticated on retry:', retrySession.user.email);
-            setUser({
-              uid: retrySession.user.id,
-              email: retrySession.user.email || '',
-              displayName: retrySession.user.user_metadata?.full_name || 'User',
-              photoURL: retrySession.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
-            });
-            setLoading(false);
-            return;
-          }
-        }
-        
-        if (mounted) {
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Auth error:', error);
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 Auth state change:', event, session?.user?.email || 'no user');
+    // Set up Firebase auth state listener
+    const unsubscribe = onAuthStateChange((user) => {
+      if (!mounted) return;
       
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user && mounted) {
-        console.log('✅ User authenticated via state change:', session.user.email);
+      if (user) {
+        console.log('✅ Firebase user authenticated:', user.email);
         setUser({
-          uid: session.user.id,
-          email: session.user.email || '',
-          displayName: session.user.user_metadata?.full_name || 'User',
-          photoURL: session.user.user_metadata?.avatar_url || 'https://i.pravatar.cc/150'
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || 'User',
+          photoURL: user.photoURL || 'https://i.pravatar.cc/150'
         });
-        setLoading(false);
-      } else if (event === 'SIGNED_OUT' && mounted) {
-        console.log('🚪 User signed out');
+      } else {
+        console.log('🚪 No Firebase user');
         setUser(null);
-        setLoading(false);
-      } else if (!session?.user && mounted && (event === 'INITIAL_SESSION')) {
-        console.log('No user session found');
-        setLoading(false);
       }
+      
+      setLoading(false);
     });
-
-    // Initialize auth
-    handleAuth();
 
     // Cleanup
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      unsubscribe();
     };
   }, [])
 
   const handleLogin = async () => {
     try {
-      console.log('Starting Google login...')
+      console.log('Starting Firebase Google login...')
+      const { user, error } = await signInWithGoogle()
       
-      // Mobile-specific login handling
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const isWebView = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
+      if (error) {
+        console.error('Firebase login error:', error)
+        alert(`Login failed: ${error.message}. Please try again or use "Enter as Guest".`)
+        return
+      }
       
-      // Use appropriate URL based on environment
-      const redirectUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:3000/' 
-        : 'https://edit-iq.github.io/editiq-workshop/';
-      
-      if (isMobile || isWebView) {
-        // For mobile/WebView, use popup mode which works better
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: redirectUrl,
-            queryParams: {
-              access_type: 'offline',
-              prompt: 'consent',
-            },
-            skipBrowserRedirect: false
-          }
-        })
-        
-        if (error) {
-          console.error('Mobile Google login error:', error)
-          alert(`Login failed: ${error.message}. You can still use "Enter as Guest" to try the demo.`)
-          return
-        }
-        
-        console.log('Mobile Google login initiated successfully:', data)
-      } else {
-        // Desktop browser - use redirect
-        const { data, error } = await signInWithGoogle()
-        
-        if (error) {
-          console.error('Google login error:', error)
-          alert(`Login failed: ${error.message}. Please check your internet connection and try again.`)
-          return
-        }
-        
-        console.log('Google login initiated successfully:', data)
+      if (user) {
+        console.log('✅ Firebase login successful:', user.email)
+        // User state will be updated by the auth state listener
       }
       
     } catch (error) {
@@ -345,7 +244,7 @@ const AppContent: React.FC = () => {
                 <div className="h-4 w-[1px] bg-slate-800"></div>
                 <div className="flex items-center gap-2">
                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                   <span className="text-[9px] font-black uppercase tracking-widest text-green-500/80">Supabase Live</span>
+                   <span className="text-[9px] font-black uppercase tracking-widest text-green-500/80">Firebase Ready</span>
                 </div>
              </div>
              <div className="flex items-center gap-4">

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Minus, Trash2, Calendar, Download } from 'lucide-react';
 import { Transaction, TransactionType, Client } from '../types';
-import { supabaseDb } from '../services/supabaseDb';
+import { firebaseDb } from '../services/firebaseDb';
 import { localDb } from '../services/localDb';
 import { ExportService } from '../services/exportService';
 
@@ -49,11 +49,11 @@ const TransactionsPage: React.FC<TransactionsPageProps> = ({ userId }) => {
       return () => clearInterval(interval);
     } else {
       // For real users, use Supabase subscriptions
-      const unsubTx = supabaseDb.subscribeToTransactions(userId, (data) => {
+      const unsubTx = firebaseDb.subscribeToTransactions(userId, (data) => {
         setTransactions(data);
       });
       
-      const unsubCl = supabaseDb.subscribeToClients(userId, (data) => {
+      const unsubCl = firebaseDb.subscribeToClients(userId, (data) => {
         setClients(data);
       });
       
@@ -72,7 +72,7 @@ const TransactionsPage: React.FC<TransactionsPageProps> = ({ userId }) => {
       if (isDemoUser) {
         localDb.addTransaction(userId, newTx);
       } else {
-        await supabaseDb.addTransaction(userId, newTx);
+        await firebaseDb.addTransaction(userId, newTx);
       }
       
       setNewTx({
@@ -95,7 +95,7 @@ const TransactionsPage: React.FC<TransactionsPageProps> = ({ userId }) => {
       if (isDemoUser) {
         localDb.deleteTransaction(userId, id);
       } else {
-        await supabaseDb.deleteTransaction(userId, id);
+        await firebaseDb.deleteTransaction(userId, id);
       }
     } catch (error) {
       console.error('Failed to delete transaction:', error);

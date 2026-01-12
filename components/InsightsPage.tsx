@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BrainCircuit, TrendingUp, AlertCircle, Lightbulb, BarChart3, PieChart, DollarSign } from 'lucide-react';
 import { Transaction, TransactionType, Client } from '../types';
-import { supabaseDb } from '../services/supabaseDb';
+import { firebaseDb } from '../services/firebaseDb';
 
 interface InsightsPageProps {
   userId: string;
@@ -29,8 +29,8 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ userId }) => {
     setLoading(true);
     try {
       const [txs, cls] = await Promise.all([
-        supabaseDb.getTransactions(userId),
-        supabaseDb.getClients(userId)
+        firebaseDb.getTransactions(userId),
+        firebaseDb.getClients(userId)
       ]);
       setTransactions(txs);
       setClients(cls);

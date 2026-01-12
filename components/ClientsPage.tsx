@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, Trash2, ExternalLink, DollarSign, Wallet, CheckCircle, Download } from 'lucide-react';
 import { Client, Platform, ProjectType, Transaction, TransactionType } from '../types';
-import { supabaseDb } from '../services/supabaseDb';
+import { firebaseDb } from '../services/firebaseDb';
 import { localDb } from '../services/localDb';
 import { ExportService } from '../services/exportService';
 
@@ -71,8 +71,8 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
         txs = localDb.getTransactions(userId);
       } else {
         const [clsData, txsData] = await Promise.all([
-          supabaseDb.getClients(userId),
-          supabaseDb.getTransactions(userId)
+          firebaseDb.getClients(userId),
+          firebaseDb.getTransactions(userId)
         ]);
         cls = clsData;
         txs = txsData;
@@ -104,7 +104,7 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
       if (isDemoUser) {
         localDb.addClient(userId, newClient);
       } else {
-        await supabaseDb.addClient(userId, newClient);
+        await firebaseDb.addClient(userId, newClient);
       }
       
       setNewClient({
@@ -127,7 +127,7 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
     e.preventDefault();
     if (!activePaymentClient || !paymentAmount) return;
     
-    await supabaseDb.addTransaction(userId, {
+    await firebaseDb.addTransaction(userId, {
       amount: parseFloat(paymentAmount),
       type: TransactionType.INCOME,
       category: activePaymentClient.projectType,
@@ -148,7 +148,7 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
         if (isDemoUser) {
           localDb.deleteClient(userId, id);
         } else {
-          await supabaseDb.deleteClient(userId, id);
+          await firebaseDb.deleteClient(userId, id);
         }
         loadData(); // Refresh the list
       } catch (error) {
