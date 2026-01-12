@@ -15,9 +15,21 @@ const AppContent: React.FC = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Handle auth redirect with better error handling
+    // Handle auth redirect with better error handling and mobile compatibility
     const handleAuthRedirect = async () => {
       try {
+        // Add mobile-specific initialization
+        if (typeof window !== 'undefined') {
+          // Prevent zoom on iOS
+          document.addEventListener('touchstart', function() {}, { passive: true });
+          
+          // Handle mobile viewport
+          const viewport = document.querySelector('meta[name=viewport]');
+          if (viewport) {
+            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+          }
+        }
+
         const { data, error } = await supabase.auth.getSession()
         if (error) {
           console.warn('Auth session error (this is normal for demo mode):', error.message)
@@ -65,16 +77,49 @@ const AppContent: React.FC = () => {
   const handleLogin = async () => {
     try {
       console.log('Starting Google login...')
-      const { data, error } = await signInWithGoogle()
       
-      if (error) {
-        console.error('Google login error:', error)
-        alert(`Login failed: ${error.message}. Please check your internet connection and try again.`)
-        return
+      // Mobile-specific login handling
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isWebView = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
+      
+      // Use production URL for redirect
+      const redirectUrl = window.location.hostname === 'localhost' 
+        ? 'https://editiq-workflow.netlify.app/' 
+        : window.location.origin;
+      
+      if (isMobile || isWebView) {
+        // For mobile/WebView, use popup mode which works better
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: redirectUrl,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'consent',
+            },
+            skipBrowserRedirect: false
+          }
+        })
+        
+        if (error) {
+          console.error('Mobile Google login error:', error)
+          alert(`Login failed: ${error.message}. You can still use "Enter as Guest" to try the demo.`)
+          return
+        }
+        
+        console.log('Mobile Google login initiated successfully:', data)
+      } else {
+        // Desktop browser - use redirect
+        const { data, error } = await signInWithGoogle()
+        
+        if (error) {
+          console.error('Google login error:', error)
+          alert(`Login failed: ${error.message}. Please check your internet connection and try again.`)
+          return
+        }
+        
+        console.log('Google login initiated successfully:', data)
       }
-      
-      console.log('Google login initiated successfully:', data)
-      // Don't set user here - let the auth state change handler do it
       
     } catch (error) {
       console.error('Login error:', error)

@@ -5,18 +5,30 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIU
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Auth helpers
+// Auth helpers with mobile compatibility
 export const signInWithGoogle = async () => {
   try {
     console.log('Initiating Google OAuth...')
+    
+    // Detect mobile/WebView environment
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isWebView = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
+    
+    // Use production URL for redirect, fallback to current origin for local development
+    const redirectUrl = window.location.hostname === 'localhost' 
+      ? 'https://editiq-workflow.netlify.app/' 
+      : window.location.origin;
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: redirectUrl,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
-        }
+        },
+        // For mobile/WebView, don't skip browser redirect
+        skipBrowserRedirect: false
       }
     })
     

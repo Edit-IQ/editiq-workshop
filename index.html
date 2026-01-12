@@ -13,9 +13,16 @@
   <meta name="mobile-web-app-capable" content="yes">
   <title>Edit IQ | Freelance Finance Hub</title>
   <script>
+    // Enhanced service worker registration with error handling
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js');
+        navigator.serviceWorker.register('/sw.js')
+          .then((registration) => {
+            console.log('SW registered: ', registration);
+          })
+          .catch((registrationError) => {
+            console.log('SW registration failed: ', registrationError);
+          });
       });
     }
   </script>
@@ -32,39 +39,67 @@
       color: #f8fafc;
       -webkit-tap-highlight-color: transparent;
       user-select: none;
+      /* Mobile optimizations */
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      touch-action: manipulation;
+      overscroll-behavior: none;
     }
+    
+    /* Mobile-specific fixes */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+    }
+    
     /* Hide scrollbars for a clean app feel */
     ::-webkit-scrollbar {
       display: none;
     }
+    
+    /* Ensure proper viewport handling */
+    html, body {
+      height: 100%;
+      overflow-x: hidden;
+    }
+    
+    #root {
+      height: 100%;
+      min-height: 100vh;
+    }
+    
     .glass-panel {
       background: rgba(15, 23, 42, 0.6);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.05);
     }
+    
     /* Pulse for Sync */
     @keyframes pulse-blue {
       0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
       70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
       100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
     }
+    
     .sync-pulse {
       animation: pulse-blue 2s infinite;
     }
+    
+    /* Mobile button improvements */
+    button {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    
+    /* Prevent zoom on input focus */
+    input, select, textarea {
+      font-size: 16px;
+    }
   </style>
-<script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.12.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
-  }
-}
-</script>
 
 </head>
 <body class="bg-slate-950 text-slate-100 overflow-x-hidden">
