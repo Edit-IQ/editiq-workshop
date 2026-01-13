@@ -63,55 +63,47 @@ const AppContent: React.FC = () => {
   }, [])
 
   const handleLogin = async () => {
+    // For mobile/WebIntoApp, skip Google auth entirely and use local mode
+    const isMobileOrWebView = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                             (window.navigator as any).standalone || 
+                             window.matchMedia('(display-mode: standalone)').matches;
+    
+    if (isMobileOrWebView) {
+      console.log('📱 Mobile/WebView detected - using local account');
+      // Create a persistent local user for mobile
+      const localUserId = localStorage.getItem('editiq-mobile-user-id') || 'mobile-user-' + Date.now();
+      localStorage.setItem('editiq-mobile-user-id', localUserId);
+      
+      setUser({
+        uid: localUserId,
+        email: 'user@editiq-mobile.local',
+        displayName: 'EditIQ User',
+        photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
+      });
+      setLoading(false);
+      return;
+    }
+    
+    // Only try Firebase auth on desktop
     try {
       console.log('🔐 Starting Firebase Google login...')
       setLoading(true)
       
-      // Check if we're on mobile
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      if (isMobile) {
-        console.log('📱 Mobile device detected - using optimized flow');
-        // Clear any existing auth state first on mobile
-        try {
-          localStorage.removeItem('firebase:authUser:' + 'AIzaSyBvQZjGhLnTormNwOvy' + ':[DEFAULT]');
-          sessionStorage.clear();
-        } catch (clearError) {
-          console.warn('Could not clear storage:', clearError);
-        }
-      }
-      
       const { user, error } = await signInWithGoogle()
       
       if (error) {
-        console.error('❌ Firebase login error:', error)
-        
-        // Provide helpful error messages
-        let errorMessage = 'Login failed. ';
-        if (error.code === 'auth/popup-blocked') {
-          errorMessage += 'Popup was blocked. Please allow popups for this site and try again.';
-        } else if (error.code === 'auth/network-request-failed') {
-          errorMessage += 'Network error. Please check your internet connection.';
-        } else if (error.message?.includes('CORS') || error.message?.includes('sessionStorage')) {
-          errorMessage += 'Browser compatibility issue. Try using "Enter as Guest" instead.';
-        } else {
-          errorMessage += error.message || 'Please try again or use "Enter as Guest".';
-        }
-        
-        alert(errorMessage)
-        setLoading(false)
-        return
+        console.error('❌ Firebase login error, using demo mode:', error)
+        handleDemoMode();
+        return;
       }
       
       if (user) {
         console.log('✅ Firebase login successful:', user.email)
-        // User state will be updated by the auth state listener
       }
       
     } catch (error) {
-      console.error('❌ Login error:', error)
-      alert('Login failed. Please try again or use "Enter as Guest".')
-      setLoading(false)
+      console.error('❌ Login error, using demo mode:', error)
+      handleDemoMode();
     }
   }
 
@@ -187,18 +179,18 @@ const AppContent: React.FC = () => {
           
           <div className="space-y-4">
             <button 
-              onClick={handleLogin}
-              className="w-full py-6 bg-white text-black font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-200 transition-all shadow-xl active:scale-95"
+              onClick={handleDemoMode}
+              className="w-full py-6 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-blue-700 transition-all shadow-xl active:scale-95"
             >
-              <LogIn size={22} /> 
-              Sign in with Google
+              <Briefcase size={22} /> 
+              Start Using EditIQ
             </button>
             
             <button 
-              onClick={handleDemoMode}
-              className="w-full py-4 text-slate-400 font-black rounded-2xl flex items-center justify-center gap-2 hover:text-white transition-all text-xs uppercase tracking-widest active:scale-95"
+              onClick={handleLogin}
+              className="w-full py-4 bg-slate-800 text-slate-300 font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-700 transition-all text-xs uppercase tracking-widest active:scale-95 border border-slate-700"
             >
-              Enter as Guest <ArrowRight size={14} />
+              <LogIn size={14} /> Create Account
             </button>
           </div>
           
