@@ -28,10 +28,11 @@ const AppContent: React.FC = () => {
   }
 
   useEffect(() => {
-    // More comprehensive WebIntoApp detection
+    // More comprehensive mobile/WebView detection
     const userAgent = navigator.userAgent;
     const href = window.location.href;
     
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
     const webIntoAppDetected = userAgent.includes('wv') || 
                               userAgent.includes('WebView') || 
                               userAgent.includes('WebIntoApp') ||
@@ -49,20 +50,21 @@ const AppContent: React.FC = () => {
                                 }
                               })();
     
-    setIsWebIntoApp(webIntoAppDetected);
+    setIsWebIntoApp(webIntoAppDetected || isMobileDevice);
     
-    console.log('🔍 WebIntoApp Detection:', {
-      detected: webIntoAppDetected,
+    console.log('🔍 Environment Detection:', {
+      detected: webIntoAppDetected || isMobileDevice,
+      isMobileDevice,
+      webIntoAppDetected,
       userAgent: userAgent.substring(0, 100),
       href: href.substring(0, 50)
     });
     
-    // If WebIntoApp is detected, automatically log in to prevent Firebase errors
-    if (webIntoAppDetected) {
-      console.log('📱 WebIntoApp detected - auto-login to prevent Firebase errors');
-      setTimeout(() => {
-        handleWebIntoAppLogin();
-      }, 1000); // Small delay to show the UI briefly
+    // If mobile/WebIntoApp is detected, immediately log in to prevent Firebase errors
+    if (webIntoAppDetected || isMobileDevice) {
+      console.log('📱 Mobile/WebIntoApp detected - immediate auto-login to prevent Firebase errors');
+      // Immediate login, no delay
+      handleWebIntoAppLogin();
       return;
     }
   }, []);
@@ -245,7 +247,7 @@ const AppContent: React.FC = () => {
             
             <div className="text-center mt-4">
               <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">
-                {isWebIntoApp ? 'WebIntoApp Optimized' : 'Mobile & Web Compatible'}
+                {isWebIntoApp ? 'Mobile Optimized - Auto Login Active' : 'Desktop & Mobile Compatible'}
               </p>
             </div>
           </div>
