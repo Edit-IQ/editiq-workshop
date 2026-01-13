@@ -260,7 +260,7 @@ const TransactionsPage: React.FC<TransactionsPageProps> = ({ userId }) => {
                 <button 
                   type="button"
                   onClick={() => setNewTx({...newTx, type: TransactionType.EXPENSE})}
-                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${newTx.type === TransactionType.EXPENSE ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${newTx.type === TransactionType.EXPENSE ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                 >
                   Expense
                 </button>

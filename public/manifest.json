@@ -1,7 +1,7 @@
 {
-  "name": "Edit IQ - Freelance Finance Hub",
-  "short_name": "Edit IQ",
-  "description": "Professional freelance finance management platform",
+  "name": "EditIQ - Freelance Finance Hub",
+  "short_name": "EditIQ",
+  "description": "Professional freelance project and finance management",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#020617",
@@ -23,6 +23,5 @@
   ],
   "categories": ["business", "finance", "productivity"],
   "lang": "en",
-  "scope": "/",
-  "prefer_related_applications": false
+  "dir": "ltr"
 }

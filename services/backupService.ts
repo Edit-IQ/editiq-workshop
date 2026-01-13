@@ -1,5 +1,4 @@
-import { supabaseDb } from './supabaseDb'
-import { localDb } from './localDb'
+import { firebaseDb } from './firebaseDb'
 
 export const BackupService = {
   // Export all user data to JSON
@@ -7,11 +6,12 @@ export const BackupService = {
     try {
       console.log('Starting data export for user:', userId)
       
-      // Get all data from appropriate source
-      const [clients, transactions, credentials] = await Promise.all([
-        userId === 'demo-user-123' ? localDb.getClients(userId) : supabaseDb.getClients(userId),
-        userId === 'demo-user-123' ? localDb.getTransactions(userId) : supabaseDb.getTransactions(userId),
-        userId === 'demo-user-123' ? localDb.getCredentials(userId) : supabaseDb.getCredentials(userId)
+      // Get all data from Firebase
+      const [clients, transactions, credentials, workspaceTasks] = await Promise.all([
+        firebaseDb.getClients(userId),
+        firebaseDb.getTransactions(userId),
+        firebaseDb.getCredentials(userId),
+        firebaseDb.getWorkspaceTasks(userId)
       ])
 
       // Create backup object
@@ -21,12 +21,14 @@ export const BackupService = {
         data: {
           clients,
           transactions,
-          credentials
+          credentials,
+          workspaceTasks
         },
         summary: {
           totalClients: clients.length,
           totalTransactions: transactions.length,
-          totalCredentials: credentials.length
+          totalCredentials: credentials.length,
+          totalWorkspaceTasks: workspaceTasks.length
         }
       }
 

@@ -6,10 +6,14 @@ import {
   Clock, 
   CheckCircle, 
   Trash2, 
-  X as CloseIcon
+  X as CloseIcon,
+  Download,
+  FileText
 } from 'lucide-react';
+import { Timestamp } from 'firebase/firestore';
 import { Client } from '../types';
-import { firebaseDb } from '../services/firebaseDb';
+import { firebaseDb, testFirestoreConnection } from '../services/firebaseDb';
+import { ExportService } from '../services/exportService';
 
 interface WorkspacePageProps {
   userId: string;
@@ -38,6 +42,7 @@ const STATUS_COLORS = {
 const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [filter, setFilter] = useState<'ALL' | TaskStatus>('ALL');
   const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month' | '30days' | 'custom'>('all');
@@ -55,70 +60,84 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
   }, [userId]);
 
   const loadData = async () => {
-    const [tasksData, clientsData] = await Promise.all([
-      getTasksFromStorage(),
-      firebaseDb.getClients(userId)
+    const [tasksData, clientsData, transactionsData] = await Promise.all([
+      firebaseDb.getWorkspaceTasks(userId),
+      firebaseDb.getClients(userId),
+      firebaseDb.getTransactions(userId)
     ]);
     setTasks(tasksData);
     setClients(clientsData);
+    setTransactions(transactionsData);
   };
 
-  // Local storage for tasks (you can integrate with Firebase later)
-  const getTasksFromStorage = (): Task[] => {
-    const stored = localStorage.getItem(`workspace_tasks_${userId}`);
-    return stored ? JSON.parse(stored) : [];
-  };
-
-  const saveTasksToStorage = (tasks: Task[]) => {
-    localStorage.setItem(`workspace_tasks_${userId}`, JSON.stringify(tasks));
-  };
-
-  const handleAddTask = (e: React.FormEvent) => {
+  const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTask.title || !newTask.clientId) return;
 
-    const task: Task = {
-      id: crypto.randomUUID(),
-      ...newTask,
-      status: 'PENDING',
-      createdAt: Date.now()
-    };
-
-    const updatedTasks = [task, ...tasks];
-    setTasks(updatedTasks);
-    saveTasksToStorage(updatedTasks);
-    
-    setNewTask({
-      title: '',
-      clientId: '',
-      description: '',
-      dueDate: new Date().toISOString().split('T')[0]
-    });
-    setIsAdding(false);
+    try {
+      console.log('🔄 Adding workspace task:', newTask);
+      console.log('🔍 User ID:', userId);
+      
+      const taskData = {
+        clientId: newTask.clientId,
+        title: newTask.title,
+        description: newTask.description,
+        status: 'PENDING',
+        dueDate: newTask.dueDate
+      };
+      
+      console.log('📝 Task data to save:', taskData);
+      
+      const taskId = await firebaseDb.addWorkspaceTask(userId, taskData);
+      console.log('✅ Task added with ID:', taskId);
+      
+      setNewTask({
+        title: '',
+        clientId: '',
+        description: '',
+        dueDate: new Date().toISOString().split('T')[0]
+      });
+      setIsAdding(false);
+      loadData(); // Refresh data
+    } catch (error) {
+      console.error('❌ Failed to add task:', error);
+      alert(`Failed to add project: ${error.message}`);
+    }
   };
 
-  const updateTaskStatus = (id: string, newStatus: TaskStatus) => {
-    const updatedTasks = tasks.map(task => {
-      if (task.id === id) {
-        const updates: Partial<Task> = { status: newStatus };
-        if (newStatus === 'WORKING' && !task.startedAt) updates.startedAt = Date.now();
-        if (newStatus === 'COMPLETED') {
-          updates.completedAt = Date.now();
-          if (!task.startedAt) updates.startedAt = Date.now();
-        }
-        return { ...task, ...updates };
+  const updateTaskStatus = async (id: string, newStatus: TaskStatus) => {
+    try {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      
+      const updates: any = { status: newStatus };
+      
+      // Add timestamps for status changes
+      if (newStatus === 'WORKING' && !task.startedAt) {
+        updates.startedAt = Date.now();
       }
-      return task;
-    });
-    setTasks(updatedTasks);
-    saveTasksToStorage(updatedTasks);
+      if (newStatus === 'COMPLETED') {
+        updates.completedAt = Date.now();
+        if (!task.startedAt) updates.startedAt = Date.now();
+      }
+      
+      await firebaseDb.updateWorkspaceTask(userId, id, updates);
+      loadData(); // Refresh data
+    } catch (error) {
+      console.error('Failed to update task status:', error);
+      alert('Failed to update project status. Please try again.');
+    }
   };
 
-  const deleteTask = (id: string) => {
+  const deleteTask = async (id: string) => {
     if (confirm('Delete this project?')) {
-      const updatedTasks = tasks.filter(t => t.id !== id);
-      setTasks(updatedTasks);
-      saveTasksToStorage(updatedTasks);
+      try {
+        await firebaseDb.deleteWorkspaceTask(userId, id);
+        loadData(); // Refresh data
+      } catch (error) {
+        console.error('Failed to delete task:', error);
+        alert('Failed to delete project. Please try again.');
+      }
     }
   };
 
@@ -213,26 +232,28 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
           <p className="text-slate-400">Manage your freelance projects and track progress.</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1">
-            {[
-              { id: 'all', label: 'All Time' },
-              { id: 'week', label: 'Last Week' },
-              { id: 'month', label: 'This Month' },
-              { id: '30days', label: 'Last 30 Days' },
-              { id: 'custom', label: 'Select Month' }
-            ].map(period => (
-              <button
-                key={period.id}
-                onClick={() => setTimeFilter(period.id as any)}
-                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-                  timeFilter === period.id
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {period.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-3">
+            <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 overflow-x-auto">
+              {[
+                { id: 'all', label: 'All Time' },
+                { id: 'week', label: 'Last Week' },
+                { id: 'month', label: 'This Month' },
+                { id: '30days', label: 'Last 30 Days' },
+                { id: 'custom', label: 'Select Month' }
+              ].map(period => (
+                <button
+                  key={period.id}
+                  onClick={() => setTimeFilter(period.id as any)}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                    timeFilter === period.id
+                      ? 'bg-blue-600 text-white shadow-lg'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {period.label}
+                </button>
+              ))}
+            </div>
           </div>
           
           {/* Month Selector */}
@@ -269,13 +290,22 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
             <div>
               <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">{stat.label}</p>
               <h3 className="text-3xl font-bold text-white mt-1">{stat.value}</h3>
-              <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest mt-1">
-                {timeFilter === 'all' ? 'All Time' : 
-                 timeFilter === 'week' ? 'Last 7 Days' :
-                 timeFilter === 'month' ? 'This Month' : 
-                 timeFilter === '30days' ? 'Last 30 Days' :
-                 new Date(selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </p>
+              <div className="space-y-1 mt-2">
+                <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest">
+                  {timeFilter === 'all' ? 'All Time' : 
+                   timeFilter === 'week' ? 'Last 7 Days' :
+                   timeFilter === 'month' ? 'This Month' : 
+                   timeFilter === '30days' ? 'Last 30 Days' :
+                   new Date(selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </p>
+                <p className="text-slate-700 text-[9px] font-mono">
+                  Updated: {new Date().toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })}
+                </p>
+              </div>
             </div>
             <div className={`p-3 rounded-2xl bg-${stat.color}-500/10 text-${stat.color}-500`}>
               <stat.icon size={24} />
@@ -439,7 +469,20 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                       </select>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="space-y-1">
+                      <div className="space-y-2">
+                        <div className="text-xs">
+                          <span className="text-slate-500">Created:</span>
+                          <span className="text-slate-300 ml-1 font-mono">
+                            {new Date(task.createdAt).toLocaleString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit'
+                            })}
+                          </span>
+                        </div>
                         {task.startedAt && (
                           <div className="text-xs">
                             <span className="text-slate-500">Started:</span>
@@ -447,8 +490,10 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                               {new Date(task.startedAt).toLocaleString('en-US', { 
                                 month: 'short', 
                                 day: 'numeric',
+                                year: 'numeric',
                                 hour: '2-digit',
-                                minute: '2-digit'
+                                minute: '2-digit',
+                                second: '2-digit'
                               })}
                             </span>
                           </div>
@@ -460,8 +505,10 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                               {new Date(task.completedAt).toLocaleString('en-US', { 
                                 month: 'short', 
                                 day: 'numeric',
+                                year: 'numeric',
                                 hour: '2-digit',
-                                minute: '2-digit'
+                                minute: '2-digit',
+                                second: '2-digit'
                               })}
                             </span>
                           </div>
@@ -470,7 +517,20 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                           <div className="text-xs">
                             <span className="text-slate-500">Duration:</span>
                             <span className="text-cyan-400 ml-1 font-mono">
-                              {Math.round((task.completedAt - task.startedAt) / (1000 * 60))}m
+                              {(() => {
+                                const durationMs = task.completedAt - task.startedAt;
+                                const seconds = Math.floor(durationMs / 1000);
+                                const minutes = Math.floor(seconds / 60);
+                                const hours = Math.floor(minutes / 60);
+                                
+                                if (hours > 0) {
+                                  return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+                                } else if (minutes > 0) {
+                                  return `${minutes}m ${seconds % 60}s`;
+                                } else {
+                                  return `${seconds}s`;
+                                }
+                              })()}
                             </span>
                           </div>
                         )}

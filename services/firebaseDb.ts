@@ -4,15 +4,55 @@ import {
   addDoc, 
   getDocs, 
   deleteDoc, 
+  updateDoc,
   query, 
   where, 
-  orderBy, 
+  orderBy,
   onSnapshot,
-  Timestamp,
-  getDoc
+  Timestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Client, Transaction, Credential } from '../types';
+
+// Helper function to safely parse createdAt dates from Firebase
+const parseCreatedAt = (createdAt: any): number => {
+  if (!createdAt) return Date.now();
+  
+  try {
+    // Firestore Timestamp with toMillis method
+    if (createdAt && typeof createdAt.toMillis === 'function') {
+      return createdAt.toMillis();
+    }
+    
+    // Firestore Timestamp object format {seconds: number, nanoseconds: number}
+    if (createdAt && typeof createdAt.seconds === 'number') {
+      return createdAt.seconds * 1000;
+    }
+    
+    // Already a number (milliseconds)
+    if (typeof createdAt === 'number') {
+      return createdAt;
+    }
+    
+    // JavaScript Date object
+    if (createdAt instanceof Date) {
+      return createdAt.getTime();
+    }
+    
+    // Date string
+    if (typeof createdAt === 'string') {
+      const parsed = new Date(createdAt).getTime();
+      return isNaN(parsed) ? Date.now() : parsed;
+    }
+    
+    // Fallback for any other format
+    console.warn('Unknown createdAt format:', typeof createdAt, createdAt);
+    return Date.now();
+  } catch (error) {
+    console.warn('Error parsing createdAt:', error, createdAt);
+    return Date.now();
+  }
+};
 
 // Test function to check Firestore connectivity
 export const testFirestoreConnection = async () => {
@@ -31,23 +71,36 @@ export const testFirestoreConnection = async () => {
     const clientsSnapshot = await getDocs(clientsQuery);
     console.log('✅ Your clients found:', clientsSnapshot.size);
     
-    clientsSnapshot.forEach((doc) => {
-      const data = doc.data();
-      console.log('📄 Client:', data.name, 'Platform:', data.platform);
-    });
-    
-    // Try to read transactions for your specific user ID
-    const transactionsQuery = query(
-      collection(db, 'transactions'),
+    // Try to read workspace tasks
+    const workspaceQuery = query(
+      collection(db, 'workspace_tasks'),
       where('userId', '==', specificUserId)
     );
-    const transactionsSnapshot = await getDocs(transactionsQuery);
-    console.log('✅ Your transactions found:', transactionsSnapshot.size);
+    const workspaceSnapshot = await getDocs(workspaceQuery);
+    console.log('✅ Your workspace tasks found:', workspaceSnapshot.size);
     
-    transactionsSnapshot.forEach((doc) => {
-      const data = doc.data();
-      console.log('💰 Transaction:', data.amount, data.type, data.category);
-    });
+    // Test adding a workspace task
+    try {
+      const testTask = {
+        title: 'Test Workspace Task',
+        description: 'Testing Firebase connection',
+        status: 'PENDING',
+        clientId: 'test-client',
+        dueDate: new Date().toISOString().split('T')[0],
+        userId: specificUserId,
+        createdAt: Timestamp.now()
+      };
+      
+      const docRef = await addDoc(collection(db, 'workspace_tasks'), testTask);
+      console.log('✅ Test workspace task added:', docRef.id);
+      
+      // Clean up test task
+      await deleteDoc(doc(db, 'workspace_tasks', docRef.id));
+      console.log('✅ Test task cleaned up');
+      
+    } catch (addError) {
+      console.error('❌ Failed to add test workspace task:', addError);
+    }
     
     return true;
   } catch (error) {
@@ -76,7 +129,7 @@ export const getDirectFirebaseData = async () => {
       clients.push({
         id: doc.id,
         ...data,
-        createdAt: data.createdAt?.toMillis() || Date.now()
+        createdAt: parseCreatedAt(data.createdAt)
       });
     });
     
@@ -156,10 +209,11 @@ export const firebaseDb = {
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         console.log('✅ Client:', doc.id, data.name);
+        
         clients.push({
           id: doc.id,
           ...data,
-          createdAt: data.createdAt?.toMillis() || Date.now()
+          createdAt: parseCreatedAt(data.createdAt)
         } as Client);
       });
       
@@ -195,10 +249,11 @@ export const firebaseDb = {
       const clients: Client[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        
         clients.push({
           id: doc.id,
           ...data,
-          createdAt: data.createdAt?.toMillis() || Date.now()
+          createdAt: parseCreatedAt(data.createdAt)
         } as Client);
       });
       // Sort in memory
@@ -419,8 +474,7 @@ export const firebaseDb = {
       
       const q = query(
         collection(db, 'credentials'),
-        where('userId', '==', firebaseUserId),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', firebaseUserId)
       );
       
       const querySnapshot = await getDocs(q);
@@ -429,12 +483,16 @@ export const firebaseDb = {
       console.log('🎯 Firebase: Filtered credentials found:', querySnapshot.size);
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        
         credentials.push({
           id: doc.id,
           ...data,
-          createdAt: data.createdAt?.toMillis() || Date.now()
+          createdAt: parseCreatedAt(data.createdAt)
         } as Credential);
       });
+      
+      // Sort in memory
+      credentials.sort((a, b) => b.createdAt - a.createdAt);
       
       return credentials;
     } catch (error) {
@@ -456,20 +514,22 @@ export const firebaseDb = {
     const firebaseUserId = this.getFirebaseUserId(userId);
     const q = query(
       collection(db, 'credentials'),
-      where('userId', '==', firebaseUserId),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', firebaseUserId)
     );
     
     return onSnapshot(q, (querySnapshot) => {
       const credentials: Credential[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        
         credentials.push({
           id: doc.id,
           ...data,
-          createdAt: data.createdAt?.toMillis() || Date.now()
+          createdAt: parseCreatedAt(data.createdAt)
         } as Credential);
       });
+      // Sort in memory
+      credentials.sort((a, b) => b.createdAt - a.createdAt);
       callback(credentials);
     });
   },
@@ -528,6 +588,144 @@ export const firebaseDb = {
       const credentials = JSON.parse(localStorage.getItem('credentials') || '[]');
       const filtered = credentials.filter((c: Credential) => c.id !== credId || c.userId !== userId);
       localStorage.setItem('credentials', JSON.stringify(credentials));
+    }
+  },
+
+  // Workspace Tasks
+  async getWorkspaceTasks(userId: string): Promise<any[]> {
+    if (this.shouldUseLocalStorage(userId)) {
+      const tasks = JSON.parse(localStorage.getItem(`workspace_tasks_${userId}`) || '[]');
+      return tasks;
+    }
+
+    try {
+      const firebaseUserId = this.getFirebaseUserId(userId);
+      console.log('🔍 Firebase: Fetching workspace tasks for userId:', userId, '-> Firebase userId:', firebaseUserId);
+      
+      const q = query(
+        collection(db, 'workspace_tasks'),
+        where('userId', '==', firebaseUserId)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const tasks: any[] = [];
+      
+      console.log('🎯 Firebase: Workspace tasks found:', querySnapshot.size);
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        tasks.push({
+          id: doc.id,
+          ...data,
+          createdAt: parseCreatedAt(data.createdAt),
+          startedAt: data.startedAt ? parseCreatedAt(data.startedAt) : undefined,
+          completedAt: data.completedAt ? parseCreatedAt(data.completedAt) : undefined
+        });
+      });
+      
+      // Sort by creation date
+      tasks.sort((a, b) => b.createdAt - a.createdAt);
+      
+      return tasks;
+    } catch (error) {
+      console.error('Get workspace tasks failed, using localStorage:', error);
+      const tasks = JSON.parse(localStorage.getItem(`workspace_tasks_${userId}`) || '[]');
+      return tasks;
+    }
+  },
+
+  async addWorkspaceTask(userId: string, taskData: any): Promise<string> {
+    const firebaseUserId = this.getFirebaseUserId(userId);
+    console.log('🔍 Adding workspace task - Original userId:', userId, '-> Firebase userId:', firebaseUserId);
+    
+    const newTask = {
+      ...taskData,
+      userId: firebaseUserId,
+      createdAt: Timestamp.now()
+    };
+
+    console.log('📝 Task data to save to Firebase:', newTask);
+
+    if (this.shouldUseLocalStorage(userId)) {
+      console.log('📱 Using localStorage for demo user');
+      const localTask = {
+        ...taskData,
+        userId,
+        createdAt: Date.now(),
+        id: crypto.randomUUID()
+      };
+      const tasks = JSON.parse(localStorage.getItem(`workspace_tasks_${userId}`) || '[]');
+      tasks.push(localTask);
+      localStorage.setItem(`workspace_tasks_${userId}`, JSON.stringify(tasks));
+      console.log('✅ Task added to localStorage:', localTask.id);
+      return localTask.id;
+    }
+
+    try {
+      console.log('🔥 Adding task to Firebase collection: workspace_tasks');
+      const docRef = await addDoc(collection(db, 'workspace_tasks'), newTask);
+      console.log('✅ Workspace task added to Firebase with ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('❌ Add workspace task to Firebase failed:', error);
+      console.error('Error details:', error.message, error.code);
+      
+      // Fallback to localStorage
+      console.log('🔄 Falling back to localStorage...');
+      const localTask = {
+        ...taskData,
+        userId,
+        createdAt: Date.now(),
+        id: crypto.randomUUID()
+      };
+      const tasks = JSON.parse(localStorage.getItem(`workspace_tasks_${userId}`) || '[]');
+      tasks.push(localTask);
+      localStorage.setItem(`workspace_tasks_${userId}`, JSON.stringify(tasks));
+      console.log('✅ Task added to localStorage as fallback:', localTask.id);
+      return localTask.id;
+    }
+  },
+
+  async updateWorkspaceTask(userId: string, taskId: string, updates: any): Promise<void> {
+    if (this.shouldUseLocalStorage(userId)) {
+      const tasks = JSON.parse(localStorage.getItem(`workspace_tasks_${userId}`) || '[]');
+      const updatedTasks = tasks.map((t: any) => 
+        t.id === taskId ? { ...t, ...updates } : t
+      );
+      localStorage.setItem(`workspace_tasks_${userId}`, JSON.stringify(updatedTasks));
+      return;
+    }
+
+    try {
+      const taskRef = doc(db, 'workspace_tasks', taskId);
+      await updateDoc(taskRef, updates);
+      console.log('✅ Workspace task updated in Firebase:', taskId);
+    } catch (error) {
+      console.error('Update workspace task failed:', error);
+      // Fallback to localStorage
+      const tasks = JSON.parse(localStorage.getItem(`workspace_tasks_${userId}`) || '[]');
+      const updatedTasks = tasks.map((t: any) => 
+        t.id === taskId ? { ...t, ...updates } : t
+      );
+      localStorage.setItem(`workspace_tasks_${userId}`, JSON.stringify(updatedTasks));
+    }
+  },
+
+  async deleteWorkspaceTask(userId: string, taskId: string): Promise<void> {
+    if (this.shouldUseLocalStorage(userId)) {
+      const tasks = JSON.parse(localStorage.getItem(`workspace_tasks_${userId}`) || '[]');
+      const filtered = tasks.filter((t: any) => t.id !== taskId);
+      localStorage.setItem(`workspace_tasks_${userId}`, JSON.stringify(filtered));
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, 'workspace_tasks', taskId));
+      console.log('✅ Workspace task deleted from Firebase:', taskId);
+    } catch (error) {
+      console.error('Delete workspace task failed:', error);
+      const tasks = JSON.parse(localStorage.getItem(`workspace_tasks_${userId}`) || '[]');
+      const filtered = tasks.filter((t: any) => t.id !== taskId);
+      localStorage.setItem(`workspace_tasks_${userId}`, JSON.stringify(filtered));
     }
   }
 };

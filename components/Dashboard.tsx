@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   BarChart, 
@@ -19,11 +18,9 @@ import {
   Download, 
   Plus, 
   FileText,
-  Database,
   CheckCircle,
   X as CloseIcon,
-  CloudLightning,
-  Users
+  CloudLightning
 } from 'lucide-react';
 import { Transaction, TransactionType, Client } from '../types';
 import { 
@@ -31,8 +28,7 @@ import {
   query, 
   where, 
   orderBy, 
-  getDocs,
-  addDoc 
+  getDocs
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { firebaseDb } from '../services/firebaseDb';
@@ -122,79 +118,19 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
       const interval = setInterval(loadLocalData, 1000);
       return () => clearInterval(interval);
     } else {
-      // For real users, try to load Firebase data directly first
-      const loadFirebaseData = async () => {
-        try {
-          console.log('🔄 Loading Firebase data directly...');
-          
-          // Use direct Firebase access with your specific user ID
-          const specificUserId = 'WpskF7imp5SEp28t0t22v5wA';
-          
-          // Get clients directly
-          const clientsQuery = query(
-            collection(db, 'clients'),
-            where('userId', '==', specificUserId),
-            orderBy('createdAt', 'desc')
-          );
-          const clientsSnapshot = await getDocs(clientsQuery);
-          const firebaseClients: Client[] = [];
-          
-          clientsSnapshot.forEach((doc) => {
-            const data = doc.data();
-            firebaseClients.push({
-              id: doc.id,
-              ...data,
-              createdAt: data.createdAt?.toMillis() || Date.now()
-            } as Client);
-          });
-          
-          // Get transactions directly
-          const transactionsQuery = query(
-            collection(db, 'transactions'),
-            where('userId', '==', specificUserId),
-            orderBy('date', 'desc')
-          );
-          const transactionsSnapshot = await getDocs(transactionsQuery);
-          const firebaseTransactions: Transaction[] = [];
-          
-          transactionsSnapshot.forEach((doc) => {
-            const data = doc.data();
-            // Normalize transaction type to uppercase to match enum
-            const normalizedType = typeof data.type === 'string' ? data.type.toUpperCase() : data.type;
-            firebaseTransactions.push({
-              id: doc.id,
-              ...data,
-              type: normalizedType // Ensure type matches TransactionType enum
-            } as Transaction);
-          });
-          
-          console.log('✅ Firebase data loaded:', {
-            clients: firebaseClients.length,
-            transactions: firebaseTransactions.length
-          });
-          
-          setClients(firebaseClients);
-          setTransactions(firebaseTransactions);
-          
-        } catch (error) {
-          console.error('❌ Firebase direct access failed:', error);
-          // Fallback to regular Firebase service
-          const unsubTx = firebaseDb.subscribeToTransactions(userId, (data) => {
-            setTransactions(data);
-          });
-          
-          const unsubCl = firebaseDb.subscribeToClients(userId, (data) => {
-            setClients(data);
-          });
-          
-          return () => {
-            unsubTx();
-            unsubCl();
-          };
-        }
-      };
+      // For real users, use Firebase service
+      const unsubTx = firebaseDb.subscribeToTransactions(userId, (data) => {
+        setTransactions(data);
+      });
       
-      loadFirebaseData();
+      const unsubCl = firebaseDb.subscribeToClients(userId, (data) => {
+        setClients(data);
+      });
+      
+      return () => {
+        unsubTx();
+        unsubCl();
+      };
     }
   }, [userId, isDemoUser]);
 
@@ -334,12 +270,28 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
   };
 
   const handleExportPDF = async () => {
-    await ExportService.exportDashboardPDF(
-      transactions, 
-      clients, 
-      'dashboard-chart',
-      `EditIQ_Dashboard_${new Date().toISOString().split('T')[0]}.pdf`
-    );
+    try {
+      // Get workspace tasks for combined report
+      const tasks = await firebaseDb.getWorkspaceTasks(userId);
+      
+      await ExportService.exportCombinedReportPDF(
+        tasks,
+        clients, 
+        transactions,
+        userId,
+        'dashboard-chart',
+        `EditIQ_Complete_Report_${new Date().toISOString().split('T')[0]}.pdf`
+      );
+    } catch (error) {
+      console.error('Failed to export combined report:', error);
+      // Fallback to dashboard-only PDF if workspace data fails
+      await ExportService.exportDashboardPDF(
+        transactions, 
+        clients, 
+        'dashboard-chart',
+        `EditIQ_Dashboard_${new Date().toISOString().split('T')[0]}.pdf`
+      );
+    }
   };
 
   const handleExportBackup = async () => {
@@ -373,182 +325,6 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
     } catch (error) {
       console.error('Backup failed:', error)
       alert('Backup failed. Please try again.')
-    }
-  };
-
-  // Force reload Firebase data
-  const forceLoadData = async () => {
-    try {
-      console.log('🔄 Force loading Firebase data...');
-      
-      // First, let's see what's actually in the database
-      console.log('🔍 Checking all clients in database...');
-      const allClientsQuery = query(collection(db, 'clients'));
-      const allClientsSnapshot = await getDocs(allClientsQuery);
-      
-      console.log('📊 Total clients in database:', allClientsSnapshot.size);
-      allClientsSnapshot.forEach((doc) => {
-        const data = doc.data();
-        console.log('📄 Client doc:', {
-          id: doc.id,
-          userId: data.userId,
-          name: data.name,
-          platform: data.platform,
-          fullData: data
-        });
-      });
-      
-      console.log('🔍 Checking all transactions in database...');
-      const allTransactionsQuery = query(collection(db, 'transactions'));
-      const allTransactionsSnapshot = await getDocs(allTransactionsQuery);
-      
-      console.log('📊 Total transactions in database:', allTransactionsSnapshot.size);
-      allTransactionsSnapshot.forEach((doc) => {
-        const data = doc.data();
-        console.log('💰 Transaction doc:', {
-          id: doc.id,
-          userId: data.userId,
-          amount: data.amount,
-          type: data.type,
-          category: data.category,
-          fullData: data
-        });
-      });
-      
-      // If no data exists, let's add some test data
-      if (allClientsSnapshot.size === 0 && allTransactionsSnapshot.size === 0) {
-        console.log('📝 No data found. Adding test data...');
-        
-        try {
-          // Add test client first
-          const testClient = {
-            name: 'Test Client',
-            platform: 'YouTube',
-            projectType: 'Video Editing',
-            notes: 'Test client for verification',
-            userId: 'WpskF7imp5SEp28t0t22v5wA',
-            createdAt: new Date()
-          };
-          
-          const clientRef = await addDoc(collection(db, 'clients'), testClient);
-          console.log('✅ Test client added:', clientRef.id);
-          
-          // Add test transaction
-          const testTransaction = {
-            amount: 5000,
-            type: 'INCOME', // Fixed: Use uppercase to match TransactionType enum
-            category: 'Freelance',
-            date: new Date().toISOString().split('T')[0],
-            note: 'Test transaction',
-            userId: 'WpskF7imp5SEp28t0t22v5wA',
-            clientId: clientRef.id // Link to the client
-          };
-          
-          const txRef = await addDoc(collection(db, 'transactions'), testTransaction);
-          console.log('✅ Test transaction added:', txRef.id);
-          
-          alert('✅ Test data added! Click Force Load again to see it.');
-          return;
-        } catch (addError) {
-          console.error('❌ Failed to add test data:', addError);
-          alert(`❌ Failed to add test data: ${addError.message}`);
-          return;
-        }
-      }
-      
-      // If we have transactions but no clients, add some clients
-      if (allClientsSnapshot.size === 0 && allTransactionsSnapshot.size > 0) {
-        console.log('📝 Found transactions but no clients. Adding sample clients...');
-        
-        try {
-          const sampleClients = [
-            {
-              name: 'YouTube Creator',
-              platform: 'YouTube',
-              projectType: 'Video Editing',
-              notes: 'Regular video editing client',
-              userId: 'WpskF7imp5SEp28t0t22v5wA',
-              createdAt: new Date()
-            },
-            {
-              name: 'Instagram Influencer',
-              platform: 'Instagram',
-              projectType: 'Graphic Design',
-              notes: 'Social media content creation',
-              userId: 'WpskF7imp5SEp28t0t22v5wA',
-              createdAt: new Date()
-            }
-          ];
-          
-          for (const client of sampleClients) {
-            const clientRef = await addDoc(collection(db, 'clients'), client);
-            console.log('✅ Sample client added:', client.name, clientRef.id);
-          }
-          
-          alert('✅ Sample clients added! Refresh to see them.');
-          return;
-        } catch (addError) {
-          console.error('❌ Failed to add sample clients:', addError);
-          alert(`❌ Failed to add clients: ${addError.message}`);
-          return;
-        }
-      }
-      
-      // Now try with your specific user ID (corrected)
-      const specificUserId = 'WpskF7imp5SEp28t0t22v5wAhQT2'; // Fixed: Added missing hQT2
-      console.log('🎯 Looking for data with userId:', specificUserId);
-      
-      // Get clients for your user ID
-      const clientsQuery = query(
-        collection(db, 'clients'),
-        where('userId', '==', specificUserId)
-      );
-      const clientsSnapshot = await getDocs(clientsQuery);
-      const firebaseClients: Client[] = [];
-      
-      clientsSnapshot.forEach((doc) => {
-        const data = doc.data();
-        firebaseClients.push({
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toMillis() || Date.now()
-        } as Client);
-      });
-      
-      // Get transactions for your user ID
-      const transactionsQuery = query(
-        collection(db, 'transactions'),
-        where('userId', '==', specificUserId)
-      );
-      const transactionsSnapshot = await getDocs(transactionsQuery);
-      const firebaseTransactions: Transaction[] = [];
-      
-      transactionsSnapshot.forEach((doc) => {
-        const data = doc.data();
-        // Normalize transaction type to uppercase to match enum
-        const normalizedType = typeof data.type === 'string' ? data.type.toUpperCase() : data.type;
-        firebaseTransactions.push({
-          id: doc.id,
-          ...data,
-          type: normalizedType // Ensure type matches TransactionType enum
-        } as Transaction);
-      });
-      
-      console.log('📊 Force loaded data:', {
-        clients: firebaseClients.length,
-        transactions: firebaseTransactions.length,
-        clientsData: firebaseClients,
-        transactionsData: firebaseTransactions
-      });
-      
-      setClients(firebaseClients);
-      setTransactions(firebaseTransactions);
-      
-      alert(`��� Data loaded! ${firebaseClients.length} clients, ${firebaseTransactions.length} transactions. Check console for details.`);
-      
-    } catch (error) {
-      console.error('❌ Force load failed:', error);
-      alert(`❌ Failed: ${error.message}`);
     }
   };
 
@@ -588,17 +364,17 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
   return (
     <div className="space-y-10 animate-in fade-in duration-1000">
       {/* Header HUD */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <header className="flex flex-col gap-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
              <div className="w-10 h-1 bg-blue-600 rounded-full"></div>
              <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em]">Operations Center</span>
           </div>
-          <h1 className="text-5xl font-black text-white tracking-tighter">Command Center</h1>
+          <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter">Command Center</h1>
         </div>
         <div className="flex flex-col gap-3">
           {/* Time Period Filter */}
-          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1">
+          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 overflow-x-auto">
             {[
               { id: 'all', label: 'All Time' },
               { id: 'week', label: 'Last Week' },
@@ -609,7 +385,7 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
               <button
                 key={period.id}
                 onClick={() => setTimeFilter(period.id as any)}
-                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                   timeFilter === period.id
                     ? 'bg-blue-600 text-white shadow-lg'
                     : 'text-slate-400 hover:text-white'
@@ -634,51 +410,22 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
           )}
           
           {/* Export Buttons */}
-          <div className="flex gap-3">
-             <button 
-               onClick={forceLoadData}
-               className="px-4 py-3 bg-orange-600 border border-orange-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-orange-700 transition-all flex items-center gap-2 text-white active:scale-95"
-             >
-                <Database size={14} /> Force Load
-             </button>
-             <button 
-               onClick={() => {
-                 // Add sample clients directly
-                 const addClients = async () => {
-                   try {
-                     const sampleClients = [
-                       { name: 'YouTube Creator', platform: 'YouTube', projectType: 'Video Editing', notes: 'Video editing client', userId: 'WpskF7imp5SEp28t0t22v5wAhQT2', createdAt: new Date() },
-                       { name: 'Instagram Influencer', platform: 'Instagram', projectType: 'Graphic Design', notes: 'Social media content', userId: 'WpskF7imp5SEp28t0t22v5wAhQT2', createdAt: new Date() }
-                     ];
-                     for (const client of sampleClients) {
-                       await addDoc(collection(db, 'clients'), client);
-                     }
-                     alert('✅ Sample clients added! Go to Clients page to see them.');
-                   } catch (error) {
-                     alert(`❌ Failed: ${error.message}`);
-                   }
-                 };
-                 addClients();
-               }}
-               className="px-4 py-3 bg-purple-600 border border-purple-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-purple-700 transition-all flex items-center gap-2 text-white active:scale-95"
-             >
-                <Users size={14} /> Add Clients
-             </button>
+          <div className="flex gap-2 overflow-x-auto pb-2">
              <button 
                onClick={handleExportCSV}
-               className="px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest hover:border-blue-500 transition-all flex items-center gap-2 text-slate-400 active:scale-95"
+               className="px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-[9px] font-black uppercase tracking-widest hover:border-blue-500 transition-all flex items-center gap-2 text-slate-400 active:scale-95 whitespace-nowrap"
              >
                 <Download size={14} /> CSV
              </button>
              <button 
                onClick={handleExportPDF}
-               className="px-4 py-3 bg-blue-600 border border-blue-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 text-white active:scale-95"
+               className="px-4 py-3 bg-blue-600 border border-blue-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 text-white active:scale-95 whitespace-nowrap"
              >
                 <FileText size={14} /> PDF Report
              </button>
              <button 
                onClick={handleExportBackup}
-               className="px-4 py-3 bg-green-600 border border-green-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-green-700 transition-all flex items-center gap-2 text-white active:scale-95"
+               className="px-4 py-3 bg-green-600 border border-green-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-green-700 transition-all flex items-center gap-2 text-white active:scale-95 whitespace-nowrap"
              >
                 <CloudLightning size={14} /> Full Backup
              </button>
@@ -716,10 +463,10 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800 rounded-[3rem] p-10 shadow-2xl overflow-hidden relative">
-          <div className="flex items-center justify-between mb-12">
+        <div className="lg:col-span-2 bg-slate-900/50 border border-slate-800 rounded-[3rem] p-6 md:p-10 shadow-2xl overflow-hidden relative">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 md:mb-12 gap-4">
              <div>
-                <h3 className="text-2xl font-black text-white tracking-tight">Performance Flow</h3>
+                <h3 className="text-xl md:text-2xl font-black text-white tracking-tight">Performance Flow</h3>
                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">
                   Real-time Metrics • {
                     timeFilter === 'all' ? 'All Time' : 
@@ -730,124 +477,221 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
                   }
                 </p>
              </div>
-             <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
-                <button onClick={() => setTimeFrame('daily')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${timeFrame === 'daily' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-white'}`}>Daily</button>
-                <button onClick={() => setTimeFrame('monthly')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${timeFrame === 'monthly' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-white'}`}>Monthly</button>
+             <div className="flex bg-slate-800/40 border border-slate-700 rounded-xl p-1">
+                <button 
+                   onClick={() => setTimeFrame('daily')}
+                   className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${timeFrame === 'daily' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                   Daily
+                </button>
+                <button 
+                   onClick={() => setTimeFrame('monthly')}
+                   className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${timeFrame === 'monthly' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                   Monthly
+                </button>
              </div>
           </div>
-          <div id="dashboard-chart" className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} opacity={0.3} />
-                <XAxis dataKey="name" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} dy={10} fontWeight={900} />
-                <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} fontWeight={900} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255, 255, 255, 0.03)' }} />
-                <Bar dataKey="income" fill={INCOME_COLOR} radius={[4, 4, 0, 0]} barSize={24} />
-                <Bar dataKey="expense" fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} barSize={24} />
-              </BarChart>
-            </ResponsiveContainer>
+          
+          <div className="h-64 md:h-80" id="dashboard-chart">
+             <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" strokeOpacity={0.3} />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }} />
+                   <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }} tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
+                   <Tooltip content={<CustomTooltip />} />
+                   <Bar dataKey="income" fill={INCOME_COLOR} radius={[8, 8, 0, 0]} />
+                   <Bar dataKey="expense" fill={EXPENSE_COLOR} radius={[8, 8, 0, 0]} />
+                </BarChart>
+             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Expenses Breakdown */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-[3rem] p-10 shadow-2xl">
-           <h3 className="text-2xl font-black text-white tracking-tight mb-2">Allocations</h3>
-           <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-8">
-             Outflow Breakdown • {
-               timeFilter === 'all' ? 'All Time' : 
-               timeFilter === 'week' ? 'Last 7 Days' :
-               timeFilter === 'month' ? 'This Month' : 
-               timeFilter === '30days' ? 'Last 30 Days' :
-               new Date(selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-             }
-           </p>
-           
-           <div className="h-64 relative mb-8">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} innerRadius={70} outerRadius={90} paddingAngle={8} dataKey="value" stroke="none" cornerRadius={10}>
-                    {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                 <span className="text-white text-2xl font-black tracking-tighter">{formatCurrency(stats.expense)}</span>
-                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Total Cost</span>
-              </div>
-           </div>
-
-           <div className="space-y-4">
-              {pieData.map((d, i) => (
-                <div key={d.name} className="flex items-center justify-between">
-                   <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
-                      <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{d.name}</span>
-                   </div>
-                   <span className="text-[11px] font-black text-white">{formatCurrency(d.value)}</span>
+        <div className="bg-slate-900/50 border border-slate-800 rounded-[3rem] p-6 md:p-10 shadow-2xl">
+          <div className="mb-8 md:mb-12">
+             <h3 className="text-xl md:text-2xl font-black text-white tracking-tight">Expense Breakdown</h3>
+             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">Top Categories</p>
+          </div>
+          
+          {pieData.length > 0 ? (
+             <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                   <PieChart>
+                      <Pie
+                         data={pieData}
+                         cx="50%"
+                         cy="50%"
+                         innerRadius={60}
+                         outerRadius={100}
+                         paddingAngle={5}
+                         dataKey="value"
+                      >
+                         {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                         ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                   </PieChart>
+                </ResponsiveContainer>
+                
+                <div className="mt-8 space-y-3">
+                   {pieData.map((item, index) => (
+                      <div key={item.name} className="flex items-center justify-between">
+                         <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                            <span className="text-xs font-bold text-slate-300">{item.name}</span>
+                         </div>
+                         <span className="text-xs font-black text-white">{formatCurrency(item.value)}</span>
+                      </div>
+                   ))}
                 </div>
-              ))}
-           </div>
+             </div>
+          ) : (
+             <div className="h-64 flex items-center justify-center">
+                <div className="text-center">
+                   <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <TrendingDown className="w-8 h-8 text-slate-600" />
+                   </div>
+                   <h3 className="text-lg font-bold text-white mb-2">No Expenses</h3>
+                   <p className="text-slate-500 text-sm">No expense data for the selected period.</p>
+                </div>
+             </div>
+          )}
         </div>
       </div>
 
-      {/* Action FAB - Positioned for mobile safety (above bottom bar) */}
-      <div className="fixed bottom-24 right-6 md:bottom-24 md:right-12 z-40">
-         <button 
-           onClick={() => { setActiveType(TransactionType.INCOME); setIsAdding(true); }}
-           className="w-16 h-16 md:w-20 md:h-20 bg-blue-600 text-white rounded-2xl md:rounded-[2.5rem] flex items-center justify-center shadow-[0_15px_40px_rgba(37,99,235,0.4)] hover:scale-110 transition-all hover:bg-blue-500 active:scale-90"
-           aria-label="Add Transaction"
-         >
-            <Plus size={32} strokeWidth={4} className="w-8 h-8 md:w-10 md:h-10" />
-         </button>
-      </div>
-
-      {/* Entry Modal */}
+      {/* Transaction Modal */}
       {isAdding && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl">
-          <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-[3rem] p-12 shadow-2xl animate-in zoom-in-95 duration-300 relative">
-            <button onClick={() => setIsAdding(false)} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-colors active:scale-90"><CloseIcon size={24} /></button>
-            <h2 className="text-3xl font-black text-white mb-2 tracking-tighter">New Entry</h2>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-10">Record Transaction</p>
-            
-            <form onSubmit={handleSubmit} className="space-y-8">
-               <div className="flex p-1 bg-slate-950 rounded-2xl border border-slate-800 mb-4">
-                  <button type="button" onClick={() => setActiveType(TransactionType.INCOME)} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeType === TransactionType.INCOME ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500'}`}>Income</button>
-                  <button type="button" onClick={() => setActiveType(TransactionType.EXPENSE)} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeType === TransactionType.EXPENSE ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-500'}`}>Expense</button>
-               </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl animate-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">New Entry</h2>
+              <button 
+                onClick={() => setIsAdding(false)} 
+                className="p-2 text-slate-400 hover:text-white transition-colors"
+              >
+                <CloseIcon size={20} />
+              </button>
+            </div>
 
-               <div className="space-y-6">
-                  <div className="relative">
-                     <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-slate-700">₹</span>
-                     <input required autoFocus type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} className="w-full pl-14 pr-6 py-8 bg-slate-950 border border-slate-800 rounded-3xl text-4xl font-black text-white focus:border-blue-500 focus:outline-none transition-all" placeholder="0.00" />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-6">
-                     <input type="text" value={category} onChange={e => setCategory(e.target.value)} className="w-full px-6 py-5 bg-slate-950 border border-slate-800 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white focus:border-blue-500 focus:outline-none" placeholder="Category" />
-                     <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-6 py-5 bg-slate-950 border border-slate-800 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white focus:border-blue-500 focus:outline-none" />
-                  </div>
-
-                  <select value={clientId} onChange={e => setClientId(e.target.value)} className="w-full px-6 py-5 bg-slate-950 border border-slate-800 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white focus:border-blue-500 focus:outline-none appearance-none cursor-pointer">
-                    <option value="">No Client Linked</option>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Income/Expense Toggle */}
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                   type="button"
+                   onClick={() => setActiveType(TransactionType.INCOME)}
+                   className={`py-3 rounded-lg text-sm font-medium transition-all ${activeType === TransactionType.INCOME ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                >
+                   Income
+                </button>
+                <button 
+                   type="button"
+                   onClick={() => setActiveType(TransactionType.EXPENSE)}
+                   className={`py-3 rounded-lg text-sm font-medium transition-all ${activeType === TransactionType.EXPENSE ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                >
+                   Expense
+                </button>
+              </div>
+              
+              {/* Amount and Date */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-2">Amount (₹)</label>
+                  <input 
+                     required
+                     type="number"
+                     step="0.01"
+                     value={amount}
+                     onChange={e => setAmount(e.target.value)}
+                     placeholder="0"
+                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-2">Date</label>
+                  <input 
+                     required
+                     type="date"
+                     value={date}
+                     onChange={e => setDate(e.target.value)}
+                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none text-white"
+                  />
+                </div>
+              </div>
+              
+              {/* Note/Description */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-2">Note / Description</label>
+                <input 
+                   type="text"
+                   value={category}
+                   onChange={e => setCategory(e.target.value)}
+                   placeholder="Subscription, client payment, etc."
+                   className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none text-white placeholder-slate-500"
+                />
+              </div>
+              
+              {/* Category and Client */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-2">Category</label>
+                  <input 
+                     type="text"
+                     placeholder="e.g. Adobe Suite"
+                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none text-white placeholder-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-2">Link Client (Optional)</label>
+                  <select 
+                     value={clientId}
+                     onChange={e => setClientId(e.target.value)}
+                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none text-white appearance-none"
+                  >
+                     <option value="">None</option>
+                     {clients.map(client => (
+                        <option key={client.id} value={client.id}>{client.name}</option>
+                     ))}
                   </select>
-               </div>
-
-               <button type="submit" disabled={isSubmitting} className={`w-full py-6 rounded-3xl text-white font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all flex items-center justify-center gap-4 ${activeType === TransactionType.INCOME ? 'bg-blue-600 shadow-blue-900/40 hover:bg-blue-500' : 'bg-rose-600 shadow-rose-900/40 hover:bg-rose-500'} active:scale-95`}>
-                  {isSubmitting ? <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full"></div> : <><CheckCircle size={20} /> Commit to Ledger</>}
-               </button>
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button 
+                   type="button"
+                   onClick={() => setIsAdding(false)}
+                   className="flex-1 py-3 text-slate-400 font-medium hover:text-white transition-colors"
+                >
+                   Cancel
+                </button>
+                <button 
+                   type="submit" 
+                   disabled={isSubmitting}
+                   className="flex-1 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50"
+                >
+                   {isSubmitting ? 'Saving...' : 'Save Entry'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Sync Status Toast */}
       {lastSaved && (
-        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[110] animate-in slide-in-from-top-12 duration-500">
-           <div className="px-6 py-3 bg-blue-600 text-white rounded-full shadow-[0_10px_30px_rgba(37,99,235,0.5)] flex items-center gap-3">
-              <CloudLightning size={16} className="animate-pulse" />
-              <span className="text-[9px] font-black uppercase tracking-widest">Synchronized • {lastSaved}</span>
-           </div>
-        </div>
+         <div className="fixed bottom-24 right-8 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl z-40">
+            <p className="text-emerald-400 text-sm font-bold">✅ Transaction saved at {lastSaved}</p>
+         </div>
+      )}
+
+      {/* Floating Action Button */}
+      {!isAdding && (
+        <button 
+           onClick={() => setIsAdding(!isAdding)}
+           className="fixed bottom-28 right-8 md:bottom-8 md:right-8 w-16 h-16 rounded-full font-bold transition-all flex items-center justify-center shadow-2xl z-50 bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 active:scale-95"
+        >
+           <Plus size={28} strokeWidth={2.5} />
+        </button>
       )}
     </div>
   );
