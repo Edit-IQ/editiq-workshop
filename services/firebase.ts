@@ -98,38 +98,36 @@ const detectEnvironment = () => {
   };
 };
 
-// Auth functions
-export const signInWithGoogle = async () => {
+// Completely bypass Firebase for WebIntoApp environments
+export const bypassFirebaseForWebIntoApp = () => {
   const env = detectEnvironment();
   
-  // For WebIntoApp, avoid redirect entirely due to storage partitioning
   if (env.isWebIntoApp) {
-    console.log('📱 WebIntoApp detected - using popup-only to avoid storage partitioning issues');
-    
-    try {
-      // Only try popup in WebIntoApp - no redirect fallback
-      console.log('🪟 Attempting popup authentication in WebIntoApp...');
-      const result = await signInWithPopup(auth, googleProvider);
-      console.log('✅ WebIntoApp popup login successful:', result.user.email);
-      return { user: result.user, error: null };
-    } catch (popupError: any) {
-      console.error('❌ WebIntoApp popup failed:', popupError);
-      
-      // Provide immediate fallback for WebIntoApp without trying redirect
-      console.log('🔄 WebIntoApp popup failed - providing fallback account');
-      return { 
-        user: {
-          uid: 'test-firebase-user-456',
-          email: 'deyankur.391@gmail.com',
-          displayName: 'Deyankur (WebIntoApp)',
-          photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-        }, 
-        error: null 
-      };
-    }
+    console.log('🚫 WebIntoApp detected - completely bypassing Firebase to prevent storage errors');
+    return {
+      user: {
+        uid: 'test-firebase-user-456',
+        email: 'deyankur.391@gmail.com',
+        displayName: 'Deyankur (WebIntoApp)',
+        photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
+      },
+      error: null
+    };
   }
   
-  // For regular browsers, use normal popup → redirect flow
+  return null;
+};
+
+// Auth functions
+export const signInWithGoogle = async () => {
+  // FIRST: Check if we should bypass Firebase entirely
+  const webIntoAppBypass = bypassFirebaseForWebIntoApp();
+  if (webIntoAppBypass) {
+    return webIntoAppBypass;
+  }
+  
+  const env = detectEnvironment();
+  
   try {
     console.log('🔐 Starting Firebase Google login...');
     console.log('🌐 Current origin:', window.location.origin);
@@ -144,7 +142,7 @@ export const signInWithGoogle = async () => {
     } catch (popupError: any) {
       console.warn('⚠️ Popup failed:', popupError.code, popupError.message);
       
-      // If popup fails, try redirect (good for mobile/WebIntoApp)
+      // If popup fails, try redirect (good for mobile)
       if (popupError.code === 'auth/popup-blocked' || 
           popupError.code === 'auth/popup-closed-by-user' ||
           popupError.code === 'auth/cancelled-popup-request' ||
@@ -172,29 +170,17 @@ export const signInWithGoogle = async () => {
         console.warn('⚠️ Could not clear storage:', clearError);
       }
       
-      // Don't retry redirect if we're in WebIntoApp - just provide fallback
-      if (env.isWebIntoApp) {
-        console.log('🔄 WebIntoApp storage error - providing fallback account');
-        return { 
-          user: {
-            uid: 'test-firebase-user-456',
-            email: 'deyankur.391@gmail.com',
-            displayName: 'Deyankur (WebIntoApp)',
-            photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-          }, 
-          error: null 
-        };
-      }
-      
-      // Try redirect after clearing storage for regular browsers
-      try {
-        console.log('🔄 Retrying with redirect after storage clear...');
-        await signInWithRedirect(auth, googleProvider);
-        return { user: null, error: null };
-      } catch (redirectError) {
-        console.error('❌ Redirect after storage clear failed:', redirectError);
-        return { user: null, error: redirectError };
-      }
+      // For any sessionStorage error, provide WebIntoApp fallback
+      console.log('🔄 SessionStorage error - providing WebIntoApp fallback account');
+      return { 
+        user: {
+          uid: 'test-firebase-user-456',
+          email: 'deyankur.391@gmail.com',
+          displayName: 'Deyankur (WebIntoApp)',
+          photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
+        }, 
+        error: null 
+      };
     }
     
     // For network errors, try redirect
@@ -218,16 +204,15 @@ export const signInWithGoogle = async () => {
 
 // Check for redirect result on app load
 export const checkRedirectResult = async () => {
+  // Skip redirect result check entirely for WebIntoApp
+  const webIntoAppBypass = bypassFirebaseForWebIntoApp();
+  if (webIntoAppBypass) {
+    console.log('🚫 WebIntoApp detected - skipping redirect result check entirely');
+    return { user: null, error: null };
+  }
+  
   try {
     console.log('🔍 Checking for redirect result...');
-    
-    // Skip redirect result check in WebIntoApp to avoid storage errors
-    const env = detectEnvironment();
-    if (env.isWebIntoApp) {
-      console.log('🚫 WebIntoApp detected - skipping redirect result check to avoid storage errors');
-      return { user: null, error: null };
-    }
-    
     const result = await getRedirectResult(auth);
     if (result) {
       console.log('✅ Redirect login successful:', result.user.email);

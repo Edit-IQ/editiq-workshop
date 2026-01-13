@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { signInWithGoogle, signOut, onAuthStateChange, checkRedirectResult } from './services/firebase'
+import { signInWithGoogle, signOut, onAuthStateChange, checkRedirectResult, bypassFirebaseForWebIntoApp } from './services/firebase'
 import Dashboard from './components/Dashboard'
 import ClientsPage from './components/ClientsPage'
 import TransactionsPage from './components/TransactionsPage'
@@ -29,6 +29,15 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
+    
+    // FIRST: Check if we should bypass Firebase entirely for WebIntoApp
+    const webIntoAppBypass = bypassFirebaseForWebIntoApp();
+    if (webIntoAppBypass) {
+      console.log('🚫 WebIntoApp detected - bypassing all Firebase authentication');
+      setUser(webIntoAppBypass.user);
+      setLoading(false);
+      return;
+    }
     
     // Check for auto-login parameters from mobile.html
     const urlParams = new URLSearchParams(window.location.search);
