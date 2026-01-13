@@ -105,11 +105,14 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
+    console.log('🔍 Dashboard useEffect - User ID:', userId, 'isDemoUser:', isDemoUser);
+    
     if (isDemoUser) {
       // For demo users, use localStorage and poll for changes
       const loadLocalData = () => {
         const txs = localDb.getTransactions(userId);
         const cls = localDb.getClients(userId);
+        console.log('📊 Demo data loaded - Transactions:', txs.length, 'Clients:', cls.length);
         setTransactions(txs);
         setClients(cls);
       };
@@ -118,12 +121,15 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
       const interval = setInterval(loadLocalData, 1000);
       return () => clearInterval(interval);
     } else {
+      console.log('🔥 Setting up Firebase subscriptions for user:', userId);
       // For real users, use Firebase service
       const unsubTx = firebaseDb.subscribeToTransactions(userId, (data) => {
+        console.log('📊 Firebase transactions loaded:', data.length);
         setTransactions(data);
       });
       
       const unsubCl = firebaseDb.subscribeToClients(userId, (data) => {
+        console.log('👥 Firebase clients loaded:', data.length);
         setClients(data);
       });
       

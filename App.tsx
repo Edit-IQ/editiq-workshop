@@ -181,14 +181,6 @@ const AppContent: React.FC = () => {
             </button>
             
             <button 
-              onClick={handleTestYourAccount}
-              className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-all text-xs uppercase tracking-widest active:scale-95"
-            >
-              <Briefcase size={14} />
-              Access Your Data
-            </button>
-            
-            <button 
               onClick={handleDemoMode}
               className="w-full py-4 text-slate-400 font-black rounded-2xl flex items-center justify-center gap-2 hover:text-white transition-all text-xs uppercase tracking-widest active:scale-95"
             >
