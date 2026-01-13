@@ -16,10 +16,11 @@ export default defineConfig({
   },
   publicDir: 'public',
   build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, 'index.html'),
-        webintoapp: path.resolve(__dirname, 'webintoapp.html')
+        main: path.resolve(__dirname, 'index.html')
       }
     }
   }
