@@ -30,6 +30,27 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     
+    // Check for auto-login parameters from mobile.html
+    const urlParams = new URLSearchParams(window.location.search);
+    const autoLogin = urlParams.get('autoLogin');
+    const userId = urlParams.get('userId');
+    const email = urlParams.get('email');
+    const displayName = urlParams.get('displayName');
+    
+    if (autoLogin && userId && email && displayName) {
+      console.log('🔗 Auto-login from mobile page:', autoLogin);
+      setUser({
+        uid: userId,
+        email: email,
+        displayName: displayName,
+        photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
+      });
+      setLoading(false);
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+    
     // Set a timeout to prevent infinite loading
     const loadingTimeout = setTimeout(() => {
       if (mounted && loading) {
