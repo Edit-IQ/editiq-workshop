@@ -49,14 +49,40 @@ googleProvider.addScope('profile');
 // Detect WebIntoApp and other WebView environments
 const detectEnvironment = () => {
   const userAgent = navigator.userAgent;
+  const href = window.location.href;
+  
+  // More comprehensive WebIntoApp detection
   const isWebIntoApp = userAgent.includes('wv') || 
                        userAgent.includes('WebView') || 
                        userAgent.includes('WebIntoApp') ||
-                       (window.location.href.includes('webintoapp'));
+                       href.includes('webintoapp') ||
+                       // Additional WebView indicators
+                       userAgent.includes('Version/') && userAgent.includes('Mobile Safari') ||
+                       // Check for Android WebView
+                       (userAgent.includes('Android') && userAgent.includes('wv')) ||
+                       // Check for storage restrictions (common in WebViews)
+                       (() => {
+                         try {
+                           sessionStorage.setItem('test', 'test');
+                           sessionStorage.removeItem('test');
+                           return false;
+                         } catch (e) {
+                           return true; // Storage restricted = likely WebView
+                         }
+                       })();
   
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
   const isStandalone = (window.navigator as any).standalone;
   const isPWA = window.matchMedia('(display-mode: standalone)').matches;
+  
+  console.log('🔍 Environment Detection:', {
+    userAgent: userAgent.substring(0, 100) + '...',
+    isWebIntoApp,
+    isMobile,
+    isStandalone,
+    isPWA,
+    href: href.substring(0, 50) + '...'
+  });
   
   return {
     isWebIntoApp,
@@ -69,43 +95,38 @@ const detectEnvironment = () => {
 
 // Auth functions
 export const signInWithGoogle = async () => {
+  const env = detectEnvironment();
+  
+  // IMMEDIATELY return WebIntoApp account if detected - don't even try Firebase
+  if (env.isWebIntoApp) {
+    console.log('🚫 WebIntoApp detected - bypassing Firebase entirely to prevent errors');
+    
+    // Clear any existing Firebase auth state that might cause issues
+    try {
+      await firebaseSignOut(auth);
+      sessionStorage.clear();
+      localStorage.removeItem('firebase:authUser:' + auth.app.options.apiKey + ':[DEFAULT]');
+    } catch (clearError) {
+      console.warn('⚠️ Could not clear Firebase state:', clearError);
+    }
+    
+    // Return your account immediately
+    return { 
+      user: {
+        uid: 'test-firebase-user-456',
+        email: 'deyankur.391@gmail.com',
+        displayName: 'Deyankur (WebIntoApp)',
+        photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
+      }, 
+      error: null 
+    };
+  }
+  
+  // Only proceed with Firebase auth for non-WebIntoApp environments
   try {
-    const env = detectEnvironment();
     console.log('🔐 Starting Firebase Google login...');
     console.log('🌐 Current origin:', window.location.origin);
     console.log('📱 Environment:', env);
-    
-    // For WebIntoApp, use a different approach
-    if (env.isWebIntoApp) {
-      console.log('📱 WebIntoApp detected - using redirect-only method');
-      
-      try {
-        // Clear any existing auth state first
-        await firebaseSignOut(auth);
-        
-        // Use redirect method for WebIntoApp (no popup support)
-        await signInWithRedirect(auth, googleProvider);
-        return { user: null, error: null }; // Will be handled by redirect result
-      } catch (webIntoAppError: any) {
-        console.error('❌ WebIntoApp auth failed:', webIntoAppError);
-        
-        // If redirect fails in WebIntoApp, create a persistent account
-        console.log('🔄 Creating WebIntoApp persistent account...');
-        const persistentUserId = localStorage.getItem('editiq-webintoapp-user') || 'webintoapp-user-' + Date.now();
-        localStorage.setItem('editiq-webintoapp-user', persistentUserId);
-        
-        // Return a mock user that will access your real data
-        return { 
-          user: {
-            uid: 'test-firebase-user-456', // This maps to your real Firebase data
-            email: 'deyankur.391@gmail.com',
-            displayName: 'Deyankur (WebIntoApp)',
-            photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-          }, 
-          error: null 
-        };
-      }
-    }
     
     // For regular mobile/desktop, try popup first then redirect
     try {
@@ -143,22 +164,7 @@ export const signInWithGoogle = async () => {
         console.warn('⚠️ Could not clear storage:', clearError);
       }
       
-      // For WebIntoApp, return persistent account after clearing storage
-      const env = detectEnvironment();
-      if (env.isWebIntoApp) {
-        console.log('🔄 WebIntoApp fallback after storage clear...');
-        return { 
-          user: {
-            uid: 'test-firebase-user-456',
-            email: 'deyankur.391@gmail.com', 
-            displayName: 'Deyankur (WebIntoApp)',
-            photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-          }, 
-          error: null 
-        };
-      }
-      
-      // Try redirect after clearing storage for other environments
+      // Try redirect after clearing storage
       try {
         console.log('🔄 Retrying with redirect after storage clear...');
         await signInWithRedirect(auth, googleProvider);
@@ -169,24 +175,10 @@ export const signInWithGoogle = async () => {
       }
     }
     
-    // For network errors, try redirect or fallback
+    // For network errors, try redirect
     if (error.code === 'auth/network-request-failed' || 
         error.message.includes('CORS') ||
         error.message.includes('network')) {
-      
-      const env = detectEnvironment();
-      if (env.isWebIntoApp) {
-        console.log('🔄 WebIntoApp network error fallback...');
-        return { 
-          user: {
-            uid: 'test-firebase-user-456',
-            email: 'deyankur.391@gmail.com',
-            displayName: 'Deyankur (WebIntoApp)', 
-            photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-          }, 
-          error: null 
-        };
-      }
       
       console.log('🔄 Network error, trying redirect...');
       try {

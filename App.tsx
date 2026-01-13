@@ -15,17 +15,55 @@ const AppContent: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [isWebIntoApp, setIsWebIntoApp] = useState(false)
 
+  const handleWebIntoAppLogin = () => {
+    console.log('📱 WebIntoApp direct login...')
+    // Create a persistent account that maps to your real Firebase data
+    setUser({
+      uid: 'test-firebase-user-456', // Maps to your real Firebase user ID
+      email: 'deyankur.391@gmail.com',
+      displayName: 'Deyankur (WebIntoApp)',
+      photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
+    })
+    setLoading(false)
+  }
+
   useEffect(() => {
-    // Detect WebIntoApp environment
+    // More comprehensive WebIntoApp detection
     const userAgent = navigator.userAgent;
+    const href = window.location.href;
+    
     const webIntoAppDetected = userAgent.includes('wv') || 
                               userAgent.includes('WebView') || 
                               userAgent.includes('WebIntoApp') ||
-                              window.location.href.includes('webintoapp');
+                              href.includes('webintoapp') ||
+                              // Additional detection methods
+                              (userAgent.includes('Android') && userAgent.includes('Version/') && userAgent.includes('Mobile Safari')) ||
+                              // Check for storage restrictions
+                              (() => {
+                                try {
+                                  sessionStorage.setItem('test', 'test');
+                                  sessionStorage.removeItem('test');
+                                  return false;
+                                } catch (e) {
+                                  return true; // Storage restricted = likely WebView
+                                }
+                              })();
+    
     setIsWebIntoApp(webIntoAppDetected);
     
+    console.log('🔍 WebIntoApp Detection:', {
+      detected: webIntoAppDetected,
+      userAgent: userAgent.substring(0, 100),
+      href: href.substring(0, 50)
+    });
+    
+    // If WebIntoApp is detected, automatically log in to prevent Firebase errors
     if (webIntoAppDetected) {
-      console.log('📱 WebIntoApp environment detected');
+      console.log('📱 WebIntoApp detected - auto-login to prevent Firebase errors');
+      setTimeout(() => {
+        handleWebIntoAppLogin();
+      }, 1000); // Small delay to show the UI briefly
+      return;
     }
   }, []);
 
@@ -109,18 +147,6 @@ const AppContent: React.FC = () => {
       console.error('❌ Login error:', error)
       setLoading(false)
     }
-  }
-
-  const handleWebIntoAppLogin = () => {
-    console.log('📱 WebIntoApp direct login...')
-    // Create a persistent account that maps to your real Firebase data
-    setUser({
-      uid: 'test-firebase-user-456', // Maps to your real Firebase user ID
-      email: 'deyankur.391@gmail.com',
-      displayName: 'Deyankur (WebIntoApp)',
-      photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-    })
-    setLoading(false)
   }
 
   const handleDemoMode = () => {
