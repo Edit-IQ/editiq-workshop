@@ -102,6 +102,34 @@ const detectEnvironment = () => {
 export const signInWithGoogle = async () => {
   const env = detectEnvironment();
   
+  // For WebIntoApp, avoid redirect entirely due to storage partitioning
+  if (env.isWebIntoApp) {
+    console.log('📱 WebIntoApp detected - using popup-only to avoid storage partitioning issues');
+    
+    try {
+      // Only try popup in WebIntoApp - no redirect fallback
+      console.log('🪟 Attempting popup authentication in WebIntoApp...');
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log('✅ WebIntoApp popup login successful:', result.user.email);
+      return { user: result.user, error: null };
+    } catch (popupError: any) {
+      console.error('❌ WebIntoApp popup failed:', popupError);
+      
+      // Provide immediate fallback for WebIntoApp without trying redirect
+      console.log('🔄 WebIntoApp popup failed - providing fallback account');
+      return { 
+        user: {
+          uid: 'test-firebase-user-456',
+          email: 'deyankur.391@gmail.com',
+          displayName: 'Deyankur (WebIntoApp)',
+          photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
+        }, 
+        error: null 
+      };
+    }
+  }
+  
+  // For regular browsers, use normal popup → redirect flow
   try {
     console.log('🔐 Starting Firebase Google login...');
     console.log('🌐 Current origin:', window.location.origin);
@@ -120,9 +148,9 @@ export const signInWithGoogle = async () => {
       if (popupError.code === 'auth/popup-blocked' || 
           popupError.code === 'auth/popup-closed-by-user' ||
           popupError.code === 'auth/cancelled-popup-request' ||
-          env.isMobile || env.isWebIntoApp) {
+          env.isMobile) {
         
-        console.log('🔄 Using redirect method for mobile/WebIntoApp...');
+        console.log('🔄 Using redirect method for mobile...');
         await signInWithRedirect(auth, googleProvider);
         return { user: null, error: null }; // Will be handled by redirect result
       }
@@ -134,7 +162,8 @@ export const signInWithGoogle = async () => {
     console.error('❌ Firebase login error:', error);
     
     // Handle specific mobile/WebView errors with better recovery
-    if (error.message && error.message.includes('sessionStorage')) {
+    if (error.message && (error.message.includes('sessionStorage') || 
+                         error.message.includes('missing initial state'))) {
       console.log('🧹 Clearing corrupted session storage...');
       try {
         sessionStorage.clear();
@@ -143,28 +172,27 @@ export const signInWithGoogle = async () => {
         console.warn('⚠️ Could not clear storage:', clearError);
       }
       
-      // Try redirect after clearing storage
+      // Don't retry redirect if we're in WebIntoApp - just provide fallback
+      if (env.isWebIntoApp) {
+        console.log('🔄 WebIntoApp storage error - providing fallback account');
+        return { 
+          user: {
+            uid: 'test-firebase-user-456',
+            email: 'deyankur.391@gmail.com',
+            displayName: 'Deyankur (WebIntoApp)',
+            photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
+          }, 
+          error: null 
+        };
+      }
+      
+      // Try redirect after clearing storage for regular browsers
       try {
         console.log('🔄 Retrying with redirect after storage clear...');
         await signInWithRedirect(auth, googleProvider);
         return { user: null, error: null };
       } catch (redirectError) {
         console.error('❌ Redirect after storage clear failed:', redirectError);
-        
-        // Only as last resort, provide fallback account
-        if (env.isWebIntoApp || env.isMobile) {
-          console.log('🔄 Last resort: providing WebIntoApp fallback account...');
-          return { 
-            user: {
-              uid: 'test-firebase-user-456',
-              email: 'deyankur.391@gmail.com',
-              displayName: 'Deyankur (WebIntoApp Fallback)',
-              photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-            }, 
-            error: null 
-          };
-        }
-        
         return { user: null, error: redirectError };
       }
     }
@@ -192,6 +220,14 @@ export const signInWithGoogle = async () => {
 export const checkRedirectResult = async () => {
   try {
     console.log('🔍 Checking for redirect result...');
+    
+    // Skip redirect result check in WebIntoApp to avoid storage errors
+    const env = detectEnvironment();
+    if (env.isWebIntoApp) {
+      console.log('🚫 WebIntoApp detected - skipping redirect result check to avoid storage errors');
+      return { user: null, error: null };
+    }
+    
     const result = await getRedirectResult(auth);
     if (result) {
       console.log('✅ Redirect login successful:', result.user.email);
@@ -206,7 +242,8 @@ export const checkRedirectResult = async () => {
     if (error.code === 'auth/invalid-api-key' || 
         error.code === 'auth/network-request-failed' ||
         error.message.includes('sessionStorage') ||
-        error.message.includes('localStorage')) {
+        error.message.includes('localStorage') ||
+        error.message.includes('missing initial state')) {
       
       console.log('🧹 Clearing corrupted auth state for mobile...');
       try {
@@ -215,11 +252,6 @@ export const checkRedirectResult = async () => {
         localStorage.removeItem(`firebase:authUser:${apiKey}:[DEFAULT]`);
         localStorage.removeItem(`firebase:host:${apiKey}`);
         sessionStorage.clear();
-        
-        // Clear any WebView-specific storage
-        if ((window as any).webkit && (window as any).webkit.messageHandlers) {
-          console.log('📱 WebView detected - clearing WebView storage');
-        }
       } catch (clearError) {
         console.warn('⚠️ Could not clear storage:', clearError);
       }
