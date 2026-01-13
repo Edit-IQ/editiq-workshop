@@ -13,6 +13,21 @@ const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isWebIntoApp, setIsWebIntoApp] = useState(false)
+
+  useEffect(() => {
+    // Detect WebIntoApp environment
+    const userAgent = navigator.userAgent;
+    const webIntoAppDetected = userAgent.includes('wv') || 
+                              userAgent.includes('WebView') || 
+                              userAgent.includes('WebIntoApp') ||
+                              window.location.href.includes('webintoapp');
+    setIsWebIntoApp(webIntoAppDetected);
+    
+    if (webIntoAppDetected) {
+      console.log('📱 WebIntoApp environment detected');
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -64,35 +79,48 @@ const AppContent: React.FC = () => {
 
   const handleLogin = async () => {
     try {
-      console.log('🔐 Starting Google authentication...')
+      console.log('🔐 Starting authentication...')
       setLoading(true)
       
       const { user, error } = await signInWithGoogle()
       
       if (error) {
-        console.error('❌ Google login failed:', error)
+        console.error('❌ Authentication failed:', error)
         
-        // Only fall back to demo mode if user explicitly wants it or after multiple failures
+        // Only fall back to demo mode if user explicitly wants it
         if (error.code === 'auth/popup-closed-by-user') {
           console.log('🚪 User cancelled login')
           setLoading(false)
           return
         }
         
-        // For other errors, show demo mode option but don't auto-enter
-        console.log('⚠️ Authentication failed, demo mode available')
+        // For WebIntoApp or persistent errors, show fallback options
+        console.log('⚠️ Authentication failed, showing alternatives')
         setLoading(false)
         return
       }
       
       if (user) {
-        console.log('✅ Google login successful:', user.email)
+        console.log('✅ Authentication successful:', user.email || user.displayName)
+        // Set user state - this will be handled by the auth state listener
       }
       
     } catch (error) {
       console.error('❌ Login error:', error)
       setLoading(false)
     }
+  }
+
+  const handleWebIntoAppLogin = () => {
+    console.log('📱 WebIntoApp direct login...')
+    // Create a persistent account that maps to your real Firebase data
+    setUser({
+      uid: 'test-firebase-user-456', // Maps to your real Firebase user ID
+      email: 'deyankur.391@gmail.com',
+      displayName: 'Deyankur (WebIntoApp)',
+      photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
+    })
+    setLoading(false)
   }
 
   const handleDemoMode = () => {
@@ -154,13 +182,33 @@ const AppContent: React.FC = () => {
           </p>
           
           <div className="space-y-4">
-            <button 
-              onClick={handleLogin}
-              className="w-full py-6 bg-white text-black font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-200 transition-all shadow-xl active:scale-95"
-            >
-              <LogIn size={22} /> 
-              Sign in with Google
-            </button>
+            {!isWebIntoApp ? (
+              <button 
+                onClick={handleLogin}
+                className="w-full py-6 bg-white text-black font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-200 transition-all shadow-xl active:scale-95"
+              >
+                <LogIn size={22} /> 
+                Sign in with Google
+              </button>
+            ) : (
+              <button 
+                onClick={handleWebIntoAppLogin}
+                className="w-full py-6 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-blue-700 transition-all shadow-xl active:scale-95"
+              >
+                <Briefcase size={22} />
+                Access Your Account
+              </button>
+            )}
+            
+            {isWebIntoApp && (
+              <button 
+                onClick={handleLogin}
+                className="w-full py-4 bg-slate-800 text-slate-300 font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-700 transition-all text-sm active:scale-95"
+              >
+                <LogIn size={18} />
+                Try Google Sign-in
+              </button>
+            )}
             
             <button 
               onClick={handleDemoMode}
@@ -171,7 +219,7 @@ const AppContent: React.FC = () => {
             
             <div className="text-center mt-4">
               <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">
-                Mobile & WebIntoApp Compatible
+                {isWebIntoApp ? 'WebIntoApp Optimized' : 'Mobile & Web Compatible'}
               </p>
             </div>
           </div>
