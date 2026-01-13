@@ -102,40 +102,12 @@ const detectEnvironment = () => {
 export const signInWithGoogle = async () => {
   const env = detectEnvironment();
   
-  // COMPLETELY BYPASS Firebase for ANY mobile/WebView environment
-  if (env.isWebIntoApp || env.isMobile || env.isWebView) {
-    console.log('🚫 Mobile/WebView detected - bypassing Firebase entirely to prevent errors');
-    console.log('📱 Environment details:', env);
-    
-    // Clear any existing Firebase auth state that might cause issues
-    try {
-      await firebaseSignOut(auth);
-      sessionStorage.clear();
-      localStorage.removeItem('firebase:authUser:' + auth.app.options.apiKey + ':[DEFAULT]');
-      console.log('🧹 Cleared all Firebase auth state');
-    } catch (clearError) {
-      console.warn('⚠️ Could not clear Firebase state:', clearError);
-    }
-    
-    // Return your account immediately for ANY mobile environment
-    console.log('✅ Returning WebIntoApp account to bypass Firebase issues');
-    return { 
-      user: {
-        uid: 'test-firebase-user-456',
-        email: 'deyankur.391@gmail.com',
-        displayName: 'Deyankur (Mobile)',
-        photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-      }, 
-      error: null 
-    };
-  }
-  
-  // Only proceed with Firebase auth for desktop browsers
   try {
-    console.log('🔐 Starting Firebase Google login for desktop...');
+    console.log('🔐 Starting Firebase Google login...');
     console.log('🌐 Current origin:', window.location.origin);
+    console.log('📱 Environment:', env);
     
-    // For desktop, try popup first then redirect
+    // Try popup first for all environments
     try {
       console.log('🪟 Attempting popup authentication...');
       const result = await signInWithPopup(auth, googleProvider);
@@ -144,12 +116,13 @@ export const signInWithGoogle = async () => {
     } catch (popupError: any) {
       console.warn('⚠️ Popup failed:', popupError.code, popupError.message);
       
-      // If popup fails, try redirect
+      // If popup fails, try redirect (good for mobile/WebIntoApp)
       if (popupError.code === 'auth/popup-blocked' || 
           popupError.code === 'auth/popup-closed-by-user' ||
-          popupError.code === 'auth/cancelled-popup-request') {
+          popupError.code === 'auth/cancelled-popup-request' ||
+          env.isMobile || env.isWebIntoApp) {
         
-        console.log('🔄 Using redirect method...');
+        console.log('🔄 Using redirect method for mobile/WebIntoApp...');
         await signInWithRedirect(auth, googleProvider);
         return { user: null, error: null }; // Will be handled by redirect result
       }
@@ -159,6 +132,58 @@ export const signInWithGoogle = async () => {
     }
   } catch (error: any) {
     console.error('❌ Firebase login error:', error);
+    
+    // Handle specific mobile/WebView errors with better recovery
+    if (error.message && error.message.includes('sessionStorage')) {
+      console.log('🧹 Clearing corrupted session storage...');
+      try {
+        sessionStorage.clear();
+        localStorage.removeItem('firebase:authUser:' + auth.app.options.apiKey + ':[DEFAULT]');
+      } catch (clearError) {
+        console.warn('⚠️ Could not clear storage:', clearError);
+      }
+      
+      // Try redirect after clearing storage
+      try {
+        console.log('🔄 Retrying with redirect after storage clear...');
+        await signInWithRedirect(auth, googleProvider);
+        return { user: null, error: null };
+      } catch (redirectError) {
+        console.error('❌ Redirect after storage clear failed:', redirectError);
+        
+        // Only as last resort, provide fallback account
+        if (env.isWebIntoApp || env.isMobile) {
+          console.log('🔄 Last resort: providing WebIntoApp fallback account...');
+          return { 
+            user: {
+              uid: 'test-firebase-user-456',
+              email: 'deyankur.391@gmail.com',
+              displayName: 'Deyankur (WebIntoApp Fallback)',
+              photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
+            }, 
+            error: null 
+          };
+        }
+        
+        return { user: null, error: redirectError };
+      }
+    }
+    
+    // For network errors, try redirect
+    if (error.code === 'auth/network-request-failed' || 
+        error.message.includes('CORS') ||
+        error.message.includes('network')) {
+      
+      console.log('🔄 Network error, trying redirect...');
+      try {
+        await signInWithRedirect(auth, googleProvider);
+        return { user: null, error: null };
+      } catch (redirectError) {
+        console.error('❌ Redirect also failed:', redirectError);
+        return { user: null, error: redirectError };
+      }
+    }
+    
     return { user: null, error };
   }
 };

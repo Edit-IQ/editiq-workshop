@@ -28,7 +28,7 @@ const AppContent: React.FC = () => {
   }
 
   useEffect(() => {
-    // More comprehensive mobile/WebView detection
+    // Detect WebIntoApp environment for UI optimization
     const userAgent = navigator.userAgent;
     const href = window.location.href;
     
@@ -36,19 +36,7 @@ const AppContent: React.FC = () => {
     const webIntoAppDetected = userAgent.includes('wv') || 
                               userAgent.includes('WebView') || 
                               userAgent.includes('WebIntoApp') ||
-                              href.includes('webintoapp') ||
-                              // Additional detection methods
-                              (userAgent.includes('Android') && userAgent.includes('Version/') && userAgent.includes('Mobile Safari')) ||
-                              // Check for storage restrictions
-                              (() => {
-                                try {
-                                  sessionStorage.setItem('test', 'test');
-                                  sessionStorage.removeItem('test');
-                                  return false;
-                                } catch (e) {
-                                  return true; // Storage restricted = likely WebView
-                                }
-                              })();
+                              href.includes('webintoapp');
     
     setIsWebIntoApp(webIntoAppDetected || isMobileDevice);
     
@@ -60,13 +48,8 @@ const AppContent: React.FC = () => {
       href: href.substring(0, 50)
     });
     
-    // If mobile/WebIntoApp is detected, immediately log in to prevent Firebase errors
-    if (webIntoAppDetected || isMobileDevice) {
-      console.log('📱 Mobile/WebIntoApp detected - immediate auto-login to prevent Firebase errors');
-      // Immediate login, no delay
-      handleWebIntoAppLogin();
-      return;
-    }
+    // Don't auto-login - let users try Gmail first
+    // Only show WebIntoApp-optimized UI
   }, []);
 
   useEffect(() => {
@@ -210,31 +193,21 @@ const AppContent: React.FC = () => {
           </p>
           
           <div className="space-y-4">
-            {!isWebIntoApp ? (
-              <button 
-                onClick={handleLogin}
-                className="w-full py-6 bg-white text-black font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-200 transition-all shadow-xl active:scale-95"
-              >
-                <LogIn size={22} /> 
-                Sign in with Google
-              </button>
-            ) : (
-              <button 
-                onClick={handleWebIntoAppLogin}
-                className="w-full py-6 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-blue-700 transition-all shadow-xl active:scale-95"
-              >
-                <Briefcase size={22} />
-                Access Your Account
-              </button>
-            )}
+            <button 
+              onClick={handleLogin}
+              className="w-full py-6 bg-white text-black font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-200 transition-all shadow-xl active:scale-95"
+            >
+              <LogIn size={22} /> 
+              Sign in with Google
+            </button>
             
             {isWebIntoApp && (
               <button 
-                onClick={handleLogin}
-                className="w-full py-4 bg-slate-800 text-slate-300 font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-700 transition-all text-sm active:scale-95"
+                onClick={handleWebIntoAppLogin}
+                className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-all text-sm active:scale-95"
               >
-                <LogIn size={18} />
-                Try Google Sign-in
+                <Briefcase size={18} />
+                WebIntoApp Backup Login
               </button>
             )}
             
@@ -247,7 +220,7 @@ const AppContent: React.FC = () => {
             
             <div className="text-center mt-4">
               <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">
-                {isWebIntoApp ? 'Mobile Optimized - Auto Login Active' : 'Desktop & Mobile Compatible'}
+                {isWebIntoApp ? 'Try Google Sign-in First - Backup Available' : 'Desktop & Mobile Compatible'}
               </p>
             </div>
           </div>
