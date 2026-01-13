@@ -67,6 +67,20 @@ const AppContent: React.FC = () => {
       console.log('🔐 Starting Firebase Google login...')
       setLoading(true)
       
+      // Check if we're on mobile
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        console.log('📱 Mobile device detected - using optimized flow');
+        // Clear any existing auth state first on mobile
+        try {
+          localStorage.removeItem('firebase:authUser:' + 'AIzaSyBvQZjGhLnTormNwOvy' + ':[DEFAULT]');
+          sessionStorage.clear();
+        } catch (clearError) {
+          console.warn('Could not clear storage:', clearError);
+        }
+      }
+      
       const { user, error } = await signInWithGoogle()
       
       if (error) {
@@ -78,8 +92,8 @@ const AppContent: React.FC = () => {
           errorMessage += 'Popup was blocked. Please allow popups for this site and try again.';
         } else if (error.code === 'auth/network-request-failed') {
           errorMessage += 'Network error. Please check your internet connection.';
-        } else if (error.message?.includes('CORS')) {
-          errorMessage += 'Browser security issue. Try using "Enter as Guest" instead.';
+        } else if (error.message?.includes('CORS') || error.message?.includes('sessionStorage')) {
+          errorMessage += 'Browser compatibility issue. Try using "Enter as Guest" instead.';
         } else {
           errorMessage += error.message || 'Please try again or use "Enter as Guest".';
         }

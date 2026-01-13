@@ -93,14 +93,30 @@ export const signInWithGoogle = async () => {
 // Check for redirect result on app load
 export const checkRedirectResult = async () => {
   try {
+    console.log('🔍 Checking for redirect result...');
     const result = await getRedirectResult(auth);
     if (result) {
       console.log('✅ Redirect login successful:', result.user.email);
       return { user: result.user, error: null };
     }
+    console.log('ℹ️ No redirect result found');
     return { user: null, error: null };
   } catch (error: any) {
-    console.error('Redirect result error:', error);
+    console.error('❌ Redirect result error:', error);
+    
+    // Clear any corrupted auth state for mobile
+    if (error.code === 'auth/invalid-api-key' || 
+        error.code === 'auth/network-request-failed' ||
+        error.message.includes('sessionStorage')) {
+      console.log('🧹 Clearing corrupted auth state...');
+      try {
+        localStorage.removeItem('firebase:authUser:' + auth.app.options.apiKey + ':[DEFAULT]');
+        sessionStorage.clear();
+      } catch (clearError) {
+        console.warn('⚠️ Could not clear storage:', clearError);
+      }
+    }
+    
     return { user: null, error };
   }
 };
