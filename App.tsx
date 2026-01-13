@@ -63,47 +63,35 @@ const AppContent: React.FC = () => {
   }, [])
 
   const handleLogin = async () => {
-    // For mobile/WebIntoApp, skip Google auth entirely and use local mode
-    const isMobileOrWebView = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                             (window.navigator as any).standalone || 
-                             window.matchMedia('(display-mode: standalone)').matches;
-    
-    if (isMobileOrWebView) {
-      console.log('📱 Mobile/WebView detected - using local account');
-      // Create a persistent local user for mobile
-      const localUserId = localStorage.getItem('editiq-mobile-user-id') || 'mobile-user-' + Date.now();
-      localStorage.setItem('editiq-mobile-user-id', localUserId);
-      
-      setUser({
-        uid: localUserId,
-        email: 'user@editiq-mobile.local',
-        displayName: 'EditIQ User',
-        photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-      });
-      setLoading(false);
-      return;
-    }
-    
-    // Only try Firebase auth on desktop
     try {
-      console.log('🔐 Starting Firebase Google login...')
+      console.log('🔐 Starting Google authentication...')
       setLoading(true)
       
       const { user, error } = await signInWithGoogle()
       
       if (error) {
-        console.error('❌ Firebase login error, using demo mode:', error)
-        handleDemoMode();
-        return;
+        console.error('❌ Google login failed:', error)
+        
+        // Only fall back to demo mode if user explicitly wants it or after multiple failures
+        if (error.code === 'auth/popup-closed-by-user') {
+          console.log('🚪 User cancelled login')
+          setLoading(false)
+          return
+        }
+        
+        // For other errors, show demo mode option but don't auto-enter
+        console.log('⚠️ Authentication failed, demo mode available')
+        setLoading(false)
+        return
       }
       
       if (user) {
-        console.log('✅ Firebase login successful:', user.email)
+        console.log('✅ Google login successful:', user.email)
       }
       
     } catch (error) {
-      console.error('❌ Login error, using demo mode:', error)
-      handleDemoMode();
+      console.error('❌ Login error:', error)
+      setLoading(false)
     }
   }
 
@@ -114,18 +102,6 @@ const AppContent: React.FC = () => {
       email: 'demo@editiq.com',
       displayName: 'Demo User',
       photoURL: 'https://i.pravatar.cc/150?u=demo'
-    })
-    setLoading(false)
-  }
-
-  const handleTestYourAccount = () => {
-    console.log('🧪 Creating test user for your account...')
-    // Create a test user that uses your specific data
-    setUser({
-      uid: 'test-firebase-user-456', // This will map to your old data
-      email: 'deyankur.391@gmail.com', // Your real Firebase email
-      displayName: 'Deyankur',
-      photoURL: 'https://lh3.googleusercontent.com/a/ACg8ocLQ9jmOkvNTf3WZBxA878NKYExP2FzJe0dB6RrbqTAw6hW-foU=s96-c'
     })
     setLoading(false)
   }
@@ -179,19 +155,25 @@ const AppContent: React.FC = () => {
           
           <div className="space-y-4">
             <button 
-              onClick={handleDemoMode}
-              className="w-full py-6 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-blue-700 transition-all shadow-xl active:scale-95"
+              onClick={handleLogin}
+              className="w-full py-6 bg-white text-black font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-200 transition-all shadow-xl active:scale-95"
             >
-              <Briefcase size={22} /> 
-              Start Using EditIQ
+              <LogIn size={22} /> 
+              Sign in with Google
             </button>
             
             <button 
-              onClick={handleLogin}
-              className="w-full py-4 bg-slate-800 text-slate-300 font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-700 transition-all text-xs uppercase tracking-widest active:scale-95 border border-slate-700"
+              onClick={handleDemoMode}
+              className="w-full py-4 text-slate-400 font-black rounded-2xl flex items-center justify-center gap-2 hover:text-white transition-all text-xs uppercase tracking-widest active:scale-95"
             >
-              <LogIn size={14} /> Create Account
+              Enter as Guest <ArrowRight size={14} />
             </button>
+            
+            <div className="text-center mt-4">
+              <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">
+                Mobile & WebIntoApp Compatible
+              </p>
+            </div>
           </div>
           
           <div className="mt-12 flex items-center justify-center gap-3">
@@ -307,7 +289,7 @@ const AppContent: React.FC = () => {
                   <LogOut size={20} />
                 </button>
                 <div className="hidden md:block px-4 py-1.5 bg-slate-800/50 rounded-full border border-slate-700/50">
-                   <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Production Ready</span>
+                   <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">v2.1.0 - Mobile Ready</span>
                 </div>
              </div>
           </div>
