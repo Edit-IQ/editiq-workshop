@@ -24,174 +24,41 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// Configure auth for better mobile compatibility
+// Configure auth for better compatibility
 auth.useDeviceLanguage();
 
-// Set up auth domain for GitHub Pages and mobile environments
-const currentDomain = window.location.hostname;
-console.log('🌍 Current domain:', currentDomain);
-
-if (currentDomain === 'localhost' || currentDomain === '127.0.0.1') {
-  console.log('🔧 Configuring Firebase for localhost...');
-} else if (currentDomain.includes('github.io')) {
-  console.log('📄 Configuring Firebase for GitHub Pages...');
-} else {
-  console.log('🌍 Configuring Firebase for production domain:', currentDomain);
-}
-
-// Configure Google Auth Provider with mobile-friendly settings
+// Configure Google Auth Provider
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
-  prompt: 'select_account',
-  // Better mobile compatibility
-  display: 'popup'
+  prompt: 'select_account'
 });
 
-// Add additional scopes for better compatibility
+// Add scopes
 googleProvider.addScope('email');
 googleProvider.addScope('profile');
 
-// Detect WebIntoApp and other WebView environments
-const detectEnvironment = () => {
-  const userAgent = navigator.userAgent;
-  const href = window.location.href;
-  
-  // More comprehensive WebIntoApp detection
-  const isWebIntoApp = userAgent.includes('wv') || 
-                       userAgent.includes('WebView') || 
-                       userAgent.includes('WebIntoApp') ||
-                       href.includes('webintoapp') ||
-                       // Additional WebView indicators
-                       userAgent.includes('Version/') && userAgent.includes('Mobile Safari') ||
-                       // Check for Android WebView
-                       (userAgent.includes('Android') && userAgent.includes('wv')) ||
-                       // Check for storage restrictions (common in WebViews)
-                       (() => {
-                         try {
-                           sessionStorage.setItem('test', 'test');
-                           sessionStorage.removeItem('test');
-                           return false;
-                         } catch (e) {
-                           return true; // Storage restricted = likely WebView
-                         }
-                       })();
-  
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-  const isStandalone = (window.navigator as any).standalone;
-  const isPWA = window.matchMedia('(display-mode: standalone)').matches;
-  
-  console.log('🔍 Environment Detection:', {
-    userAgent: userAgent.substring(0, 100) + '...',
-    isWebIntoApp,
-    isMobile,
-    isStandalone,
-    isPWA,
-    href: href.substring(0, 50) + '...'
-  });
-  
-  return {
-    isWebIntoApp,
-    isMobile,
-    isStandalone,
-    isPWA,
-    isWebView: isWebIntoApp || isStandalone || isPWA
-  };
-};
-
-// Completely bypass Firebase for WebIntoApp environments
-export const bypassFirebaseForWebIntoApp = () => {
-  const env = detectEnvironment();
-  
-  if (env.isWebIntoApp) {
-    console.log('🚫 WebIntoApp detected - completely bypassing Firebase to prevent storage errors');
-    return {
-      user: {
-        uid: 'test-firebase-user-456',
-        email: 'deyankur.391@gmail.com',
-        displayName: 'Deyankur (WebIntoApp)',
-        photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-      },
-      error: null
-    };
-  }
-  
-  return null;
-};
-
 // Auth functions
 export const signInWithGoogle = async () => {
-  // FIRST: Check if we should bypass Firebase entirely
-  const webIntoAppBypass = bypassFirebaseForWebIntoApp();
-  if (webIntoAppBypass) {
-    return webIntoAppBypass;
-  }
-  
-  const env = detectEnvironment();
-  
   try {
-    console.log('🔐 Starting Firebase Google login...');
-    console.log('🌐 Current origin:', window.location.origin);
-    console.log('📱 Environment:', env);
+    console.log('🔐 Starting Google sign-in...');
     
-    // Try popup first for all environments
-    try {
-      console.log('🪟 Attempting popup authentication...');
-      const result = await signInWithPopup(auth, googleProvider);
-      console.log('✅ Popup login successful:', result.user.email);
-      return { user: result.user, error: null };
-    } catch (popupError: any) {
-      console.warn('⚠️ Popup failed:', popupError.code, popupError.message);
+    // Try popup authentication
+    const result = await signInWithPopup(auth, googleProvider);
+    console.log('✅ Login successful:', result.user.email);
+    return { user: result.user, error: null };
+    
+  } catch (error: any) {
+    console.error('❌ Login error:', error);
+    
+    // If popup fails, try redirect as fallback
+    if (error.code === 'auth/popup-blocked' || 
+        error.code === 'auth/popup-closed-by-user' ||
+        error.code === 'auth/cancelled-popup-request') {
       
-      // If popup fails, try redirect (good for mobile)
-      if (popupError.code === 'auth/popup-blocked' || 
-          popupError.code === 'auth/popup-closed-by-user' ||
-          popupError.code === 'auth/cancelled-popup-request' ||
-          env.isMobile) {
-        
-        console.log('🔄 Using redirect method for mobile...');
+      console.log('🔄 Popup blocked, using redirect...');
+      try {
         await signInWithRedirect(auth, googleProvider);
         return { user: null, error: null }; // Will be handled by redirect result
-      }
-      
-      // For other popup errors, throw to be handled below
-      throw popupError;
-    }
-  } catch (error: any) {
-    console.error('❌ Firebase login error:', error);
-    
-    // Handle specific mobile/WebView errors with better recovery
-    if (error.message && (error.message.includes('sessionStorage') || 
-                         error.message.includes('missing initial state'))) {
-      console.log('🧹 Clearing corrupted session storage...');
-      try {
-        sessionStorage.clear();
-        localStorage.removeItem('firebase:authUser:' + auth.app.options.apiKey + ':[DEFAULT]');
-      } catch (clearError) {
-        console.warn('⚠️ Could not clear storage:', clearError);
-      }
-      
-      // For any sessionStorage error, provide WebIntoApp fallback
-      console.log('🔄 SessionStorage error - providing WebIntoApp fallback account');
-      return { 
-        user: {
-          uid: 'test-firebase-user-456',
-          email: 'deyankur.391@gmail.com',
-          displayName: 'Deyankur (WebIntoApp)',
-          photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-        }, 
-        error: null 
-      };
-    }
-    
-    // For network errors, try redirect
-    if (error.code === 'auth/network-request-failed' || 
-        error.message.includes('CORS') ||
-        error.message.includes('network')) {
-      
-      console.log('🔄 Network error, trying redirect...');
-      try {
-        await signInWithRedirect(auth, googleProvider);
-        return { user: null, error: null };
       } catch (redirectError) {
         console.error('❌ Redirect also failed:', redirectError);
         return { user: null, error: redirectError };
@@ -204,13 +71,6 @@ export const signInWithGoogle = async () => {
 
 // Check for redirect result on app load
 export const checkRedirectResult = async () => {
-  // Skip redirect result check entirely for WebIntoApp
-  const webIntoAppBypass = bypassFirebaseForWebIntoApp();
-  if (webIntoAppBypass) {
-    console.log('🚫 WebIntoApp detected - skipping redirect result check entirely');
-    return { user: null, error: null };
-  }
-  
   try {
     console.log('🔍 Checking for redirect result...');
     const result = await getRedirectResult(auth);
@@ -222,26 +82,6 @@ export const checkRedirectResult = async () => {
     return { user: null, error: null };
   } catch (error: any) {
     console.error('❌ Redirect result error:', error);
-    
-    // Handle mobile-specific errors
-    if (error.code === 'auth/invalid-api-key' || 
-        error.code === 'auth/network-request-failed' ||
-        error.message.includes('sessionStorage') ||
-        error.message.includes('localStorage') ||
-        error.message.includes('missing initial state')) {
-      
-      console.log('🧹 Clearing corrupted auth state for mobile...');
-      try {
-        // Clear all Firebase auth storage
-        const apiKey = auth.app.options.apiKey;
-        localStorage.removeItem(`firebase:authUser:${apiKey}:[DEFAULT]`);
-        localStorage.removeItem(`firebase:host:${apiKey}`);
-        sessionStorage.clear();
-      } catch (clearError) {
-        console.warn('⚠️ Could not clear storage:', clearError);
-      }
-    }
-    
     return { user: null, error };
   }
 };

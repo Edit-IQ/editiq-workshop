@@ -1,205 +1,111 @@
 import React, { useState, useEffect } from 'react'
-import { signInWithGoogle, signOut, onAuthStateChange, checkRedirectResult, bypassFirebaseForWebIntoApp } from './services/firebase'
+import { signInWithGoogle, signOut, onAuthStateChange, checkRedirectResult } from './services/firebase'
 import Dashboard from './components/Dashboard'
 import ClientsPage from './components/ClientsPage'
 import TransactionsPage from './components/TransactionsPage'
 import InsightsPage from './components/InsightsPage'
 import CredentialsPage from './components/CredentialsPage'
 import WorkspacePage from './components/WorkspacePage'
-import { LayoutDashboard, Users, Receipt, BrainCircuit, Shield, LogOut, LogIn, ArrowRight, Briefcase } from 'lucide-react'
+import { LayoutDashboard, Users, Receipt, BrainCircuit, Shield, LogOut, LogIn, Briefcase } from 'lucide-react'
 import { UserProfile } from './types'
 
 const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isWebIntoApp, setIsWebIntoApp] = useState(false)
-
-  const handleWebIntoAppLogin = () => {
-    console.log('📱 WebIntoApp direct login...')
-    // Create a persistent account that maps to your real Firebase data
-    setUser({
-      uid: 'test-firebase-user-456', // Maps to your real Firebase user ID
-      email: 'deyankur.391@gmail.com',
-      displayName: 'Deyankur (WebIntoApp)',
-      photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-    })
-    setLoading(false)
-  }
 
   useEffect(() => {
     let mounted = true;
     
-    // FIRST: Check if we should bypass Firebase entirely for WebIntoApp
-    const webIntoAppBypass = bypassFirebaseForWebIntoApp();
-    if (webIntoAppBypass) {
-      console.log('🚫 WebIntoApp detected - bypassing all Firebase authentication');
-      setUser(webIntoAppBypass.user);
-      setLoading(false);
-      return;
-    }
-    
-    // Check for auto-login parameters from mobile.html
-    const urlParams = new URLSearchParams(window.location.search);
-    const autoLogin = urlParams.get('autoLogin');
-    const userId = urlParams.get('userId');
-    const email = urlParams.get('email');
-    const displayName = urlParams.get('displayName');
-    
-    if (autoLogin && userId && email && displayName) {
-      console.log('🔗 Auto-login from mobile page:', autoLogin);
-      setUser({
-        uid: userId,
-        email: email,
-        displayName: displayName,
-        photoURL: 'https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png'
-      });
-      setLoading(false);
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      return;
-    }
-    
-    // Set a timeout to prevent infinite loading
-    const loadingTimeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.log('⏰ Loading timeout - entering demo mode');
-        setUser({
-          uid: 'demo-user-123',
-          email: 'demo@editiq.com',
-          displayName: 'Demo User',
-          photoURL: 'https://i.pravatar.cc/150?u=demo'
-        });
-        setLoading(false);
-      }
-    }, 10000); // 10 second timeout
-    
-    // Detect WebIntoApp environment for UI optimization
-    const userAgent = navigator.userAgent;
-    const href = window.location.href;
-    
-    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-    const webIntoAppDetected = userAgent.includes('wv') || 
-                              userAgent.includes('WebView') || 
-                              userAgent.includes('WebIntoApp') ||
-                              href.includes('webintoapp');
-    
-    setIsWebIntoApp(webIntoAppDetected || isMobileDevice);
-    
-    console.log('🔍 Environment Detection:', {
-      detected: webIntoAppDetected || isMobileDevice,
-      isMobileDevice,
-      webIntoAppDetected,
-      userAgent: userAgent.substring(0, 100),
-      href: href.substring(0, 50)
-    });
-    
     // Check for redirect result first
     const handleRedirectResult = async () => {
-      try {
-        const { user: redirectUser } = await checkRedirectResult();
-        if (redirectUser && mounted) {
-          console.log('✅ Redirect authentication successful:', redirectUser.email);
-          setUser({
-            uid: redirectUser.uid,
-            email: redirectUser.email || '',
-            displayName: redirectUser.displayName || 'User',
-            photoURL: redirectUser.photoURL || 'https://i.pravatar.cc/150'
-          });
-          setLoading(false);
-          clearTimeout(loadingTimeout);
-          return;
-        }
-      } catch (redirectError) {
-        console.error('❌ Redirect result error:', redirectError);
+      const { user: redirectUser } = await checkRedirectResult();
+      if (redirectUser && mounted) {
+        console.log('✅ Redirect authentication successful:', redirectUser.email);
+        setUser({
+          uid: redirectUser.uid,
+          email: redirectUser.email || '',
+          displayName: redirectUser.displayName || 'User',
+          photoURL: redirectUser.photoURL || 'https://i.pravatar.cc/150'
+        });
+        setLoading(false);
+        return;
       }
       
       // Set up Firebase auth state listener
-      try {
-        const unsubscribe = onAuthStateChange((user) => {
-          if (!mounted) return;
-          
-          if (user) {
-            console.log('✅ Firebase user authenticated:', user.email);
-            setUser({
-              uid: user.uid,
-              email: user.email || '',
-              displayName: user.displayName || 'User',
-              photoURL: user.photoURL || 'https://i.pravatar.cc/150'
-            });
-          } else {
-            console.log('🚪 No Firebase user');
-            setUser(null);
-          }
-          
-          setLoading(false);
-          clearTimeout(loadingTimeout);
-        });
-
-        // Cleanup
-        return () => {
-          mounted = false;
-          unsubscribe();
-          clearTimeout(loadingTimeout);
-        };
-      } catch (authError) {
-        console.error('❌ Auth state listener error:', authError);
-        if (mounted) {
-          setLoading(false);
-          clearTimeout(loadingTimeout);
+      const unsubscribe = onAuthStateChange((user) => {
+        if (!mounted) return;
+        
+        if (user) {
+          console.log('✅ Firebase user authenticated:', user.email);
+          setUser({
+            uid: user.uid,
+            email: user.email || '',
+            displayName: user.displayName || 'User',
+            photoURL: user.photoURL || 'https://i.pravatar.cc/150'
+          });
+        } else {
+          console.log('🚪 No Firebase user');
+          setUser(null);
         }
-      }
+        
+        setLoading(false);
+      });
+
+      // Cleanup
+      return () => {
+        mounted = false;
+        unsubscribe();
+      };
     };
     
     handleRedirectResult();
-    
-    return () => {
-      mounted = false;
-      clearTimeout(loadingTimeout);
-    };
   }, [])
 
   const handleLogin = async () => {
     try {
-      console.log('🔐 Starting authentication...')
+      console.log('🔐 Starting Google sign-in...')
       setLoading(true)
       
       const { user, error } = await signInWithGoogle()
       
       if (error) {
-        console.error('❌ Authentication failed:', error)
+        console.error('❌ Login error:', error)
         
-        // Only fall back to demo mode if user explicitly wants it
-        if (error.code === 'auth/popup-closed-by-user') {
-          console.log('🚪 User cancelled login')
-          setLoading(false)
-          return
+        // Provide helpful error messages
+        let errorMessage = 'Login failed. ';
+        if (error.code === 'auth/popup-blocked') {
+          errorMessage += 'Popup was blocked. Please allow popups for this site and try again.';
+        } else if (error.code === 'auth/network-request-failed') {
+          errorMessage += 'Network error. Please check your internet connection.';
+        } else {
+          errorMessage += error.message || 'Please try again or use "Enter as Guest".';
         }
         
-        // For WebIntoApp or persistent errors, show fallback options
-        console.log('⚠️ Authentication failed, showing alternatives')
+        alert(errorMessage)
         setLoading(false)
         return
       }
       
       if (user) {
-        console.log('✅ Authentication successful:', user.email || user.displayName)
-        // Set user state - this will be handled by the auth state listener
+        console.log('✅ Login successful:', user.email)
+        // User state will be updated by the auth state listener
       }
       
     } catch (error) {
       console.error('❌ Login error:', error)
+      alert('Login failed. Please try again or use "Enter as Guest".')
       setLoading(false)
     }
   }
 
-  const handleDemoMode = () => {
-    console.log('🎭 Entering demo mode...')
+  const handleGuestMode = () => {
+    console.log('🎭 Entering guest mode...')
     setUser({
-      uid: 'demo-user-123',
-      email: 'demo@editiq.com',
-      displayName: 'Demo User',
-      photoURL: 'https://i.pravatar.cc/150?u=demo'
+      uid: 'guest-user-123',
+      email: 'guest@editiq.com',
+      displayName: 'Guest User',
+      photoURL: 'https://i.pravatar.cc/150?u=guest'
     })
     setLoading(false)
   }
@@ -214,33 +120,22 @@ const AppContent: React.FC = () => {
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_20px_#2563eb]"></div>
         <p className="text-blue-500 font-black uppercase tracking-[0.3em] text-[10px] animate-pulse text-center px-4 mb-8">
-          Loading Edit IQ...
+          Connecting to Firebase...
         </p>
-        <div className="flex flex-col gap-4">
-          <button 
-            onClick={() => {
-              setUser({
-                uid: 'demo-user-123',
-                email: 'demo@editiq.com',
-                displayName: 'Demo User',
-                photoURL: 'https://i.pravatar.cc/150?u=demo'
-              });
-              setLoading(false);
-            }}
-            className="px-6 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors border border-slate-600"
-          >
-            Skip & Enter Demo Mode
-          </button>
-          
-          {isWebIntoApp && (
-            <button 
-              onClick={handleWebIntoAppLogin}
-              className="px-6 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              WebIntoApp Login
-            </button>
-          )}
-        </div>
+        <button 
+          onClick={() => {
+            setUser({
+              uid: 'guest-user-123',
+              email: 'guest@editiq.com',
+              displayName: 'Guest User',
+              photoURL: 'https://i.pravatar.cc/150?u=guest'
+            });
+            setLoading(false);
+          }}
+          className="px-6 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors border border-slate-600"
+        >
+          Skip & Enter Guest Mode
+        </button>
       </div>
     )
   }
@@ -265,34 +160,18 @@ const AppContent: React.FC = () => {
           <div className="space-y-4">
             <button 
               onClick={handleLogin}
-              className="w-full py-6 bg-white text-black font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-200 transition-all shadow-xl active:scale-95"
+              className="w-full py-6 bg-white text-slate-900 font-black rounded-2xl flex items-center justify-center gap-4 hover:bg-gray-100 transition-all shadow-xl active:scale-95"
             >
               <LogIn size={22} /> 
               Sign in with Google
             </button>
             
-            {isWebIntoApp && (
-              <button 
-                onClick={handleWebIntoAppLogin}
-                className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-all text-sm active:scale-95"
-              >
-                <Briefcase size={18} />
-                WebIntoApp Backup Login
-              </button>
-            )}
-            
             <button 
-              onClick={handleDemoMode}
-              className="w-full py-4 text-slate-400 font-black rounded-2xl flex items-center justify-center gap-2 hover:text-white transition-all text-xs uppercase tracking-widest active:scale-95"
+              onClick={handleGuestMode}
+              className="w-full py-4 bg-slate-800 text-slate-300 font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-700 transition-all text-xs uppercase tracking-widest active:scale-95 border border-slate-700"
             >
-              Enter as Guest <ArrowRight size={14} />
+              <Briefcase size={14} /> Enter as Guest
             </button>
-            
-            <div className="text-center mt-4">
-              <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">
-                {isWebIntoApp ? 'Try Google Sign-in First - Backup Available' : 'Desktop & Mobile Compatible'}
-              </p>
-            </div>
           </div>
           
           <div className="mt-12 flex items-center justify-center gap-3">
