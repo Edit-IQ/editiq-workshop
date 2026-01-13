@@ -27,11 +27,16 @@ export const db = getFirestore(app);
 // Configure auth for better mobile compatibility
 auth.useDeviceLanguage();
 
-// Set up auth domain for localhost and mobile environments
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+// Set up auth domain for GitHub Pages and mobile environments
+const currentDomain = window.location.hostname;
+console.log('🌍 Current domain:', currentDomain);
+
+if (currentDomain === 'localhost' || currentDomain === '127.0.0.1') {
   console.log('🔧 Configuring Firebase for localhost...');
+} else if (currentDomain.includes('github.io')) {
+  console.log('📄 Configuring Firebase for GitHub Pages...');
 } else {
-  console.log('🌍 Configuring Firebase for production domain:', window.location.hostname);
+  console.log('🌍 Configuring Firebase for production domain:', currentDomain);
 }
 
 // Configure Google Auth Provider with mobile-friendly settings
