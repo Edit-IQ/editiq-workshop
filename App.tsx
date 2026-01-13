@@ -28,6 +28,22 @@ const AppContent: React.FC = () => {
   }
 
   useEffect(() => {
+    let mounted = true;
+    
+    // Set a timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.log('⏰ Loading timeout - entering demo mode');
+        setUser({
+          uid: 'demo-user-123',
+          email: 'demo@editiq.com',
+          displayName: 'Demo User',
+          photoURL: 'https://i.pravatar.cc/150?u=demo'
+        });
+        setLoading(false);
+      }
+    }, 10000); // 10 second timeout
+    
     // Detect WebIntoApp environment for UI optimization
     const userAgent = navigator.userAgent;
     const href = window.location.href;
@@ -48,56 +64,69 @@ const AppContent: React.FC = () => {
       href: href.substring(0, 50)
     });
     
-    // Don't auto-login - let users try Gmail first
-    // Only show WebIntoApp-optimized UI
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    
     // Check for redirect result first
     const handleRedirectResult = async () => {
-      const { user: redirectUser } = await checkRedirectResult();
-      if (redirectUser && mounted) {
-        console.log('✅ Redirect authentication successful:', redirectUser.email);
-        setUser({
-          uid: redirectUser.uid,
-          email: redirectUser.email || '',
-          displayName: redirectUser.displayName || 'User',
-          photoURL: redirectUser.photoURL || 'https://i.pravatar.cc/150'
-        });
-        setLoading(false);
-        return;
+      try {
+        const { user: redirectUser } = await checkRedirectResult();
+        if (redirectUser && mounted) {
+          console.log('✅ Redirect authentication successful:', redirectUser.email);
+          setUser({
+            uid: redirectUser.uid,
+            email: redirectUser.email || '',
+            displayName: redirectUser.displayName || 'User',
+            photoURL: redirectUser.photoURL || 'https://i.pravatar.cc/150'
+          });
+          setLoading(false);
+          clearTimeout(loadingTimeout);
+          return;
+        }
+      } catch (redirectError) {
+        console.error('❌ Redirect result error:', redirectError);
       }
       
       // Set up Firebase auth state listener
-      const unsubscribe = onAuthStateChange((user) => {
-        if (!mounted) return;
-        
-        if (user) {
-          console.log('✅ Firebase user authenticated:', user.email);
-          setUser({
-            uid: user.uid,
-            email: user.email || '',
-            displayName: user.displayName || 'User',
-            photoURL: user.photoURL || 'https://i.pravatar.cc/150'
-          });
-        } else {
-          console.log('🚪 No Firebase user');
-          setUser(null);
-        }
-        
-        setLoading(false);
-      });
+      try {
+        const unsubscribe = onAuthStateChange((user) => {
+          if (!mounted) return;
+          
+          if (user) {
+            console.log('✅ Firebase user authenticated:', user.email);
+            setUser({
+              uid: user.uid,
+              email: user.email || '',
+              displayName: user.displayName || 'User',
+              photoURL: user.photoURL || 'https://i.pravatar.cc/150'
+            });
+          } else {
+            console.log('🚪 No Firebase user');
+            setUser(null);
+          }
+          
+          setLoading(false);
+          clearTimeout(loadingTimeout);
+        });
 
-      // Cleanup
-      return () => {
-        mounted = false;
-        unsubscribe();
-      };
+        // Cleanup
+        return () => {
+          mounted = false;
+          unsubscribe();
+          clearTimeout(loadingTimeout);
+        };
+      } catch (authError) {
+        console.error('❌ Auth state listener error:', authError);
+        if (mounted) {
+          setLoading(false);
+          clearTimeout(loadingTimeout);
+        }
+      }
     };
     
     handleRedirectResult();
+    
+    return () => {
+      mounted = false;
+      clearTimeout(loadingTimeout);
+    };
   }, [])
 
   const handleLogin = async () => {
@@ -155,22 +184,33 @@ const AppContent: React.FC = () => {
       <div className="h-screen flex flex-col items-center justify-center bg-[#020617]">
         <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_20px_#2563eb]"></div>
         <p className="text-blue-500 font-black uppercase tracking-[0.3em] text-[10px] animate-pulse text-center px-4 mb-8">
-          Connecting to Firebase...
+          Loading Edit IQ...
         </p>
-        <button 
-          onClick={() => {
-            setUser({
-              uid: 'demo-user-123',
-              email: 'demo@editiq.com',
-              displayName: 'Demo User',
-              photoURL: 'https://i.pravatar.cc/150?u=demo'
-            });
-            setLoading(false);
-          }}
-          className="px-6 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors border border-slate-600"
-        >
-          Skip & Enter Demo Mode
-        </button>
+        <div className="flex flex-col gap-4">
+          <button 
+            onClick={() => {
+              setUser({
+                uid: 'demo-user-123',
+                email: 'demo@editiq.com',
+                displayName: 'Demo User',
+                photoURL: 'https://i.pravatar.cc/150?u=demo'
+              });
+              setLoading(false);
+            }}
+            className="px-6 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors border border-slate-600"
+          >
+            Skip & Enter Demo Mode
+          </button>
+          
+          {isWebIntoApp && (
+            <button 
+              onClick={handleWebIntoAppLogin}
+              className="px-6 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              WebIntoApp Login
+            </button>
+          )}
+        </div>
       </div>
     )
   }
