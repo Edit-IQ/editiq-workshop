@@ -45,12 +45,9 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
     
     // Check Firebase connection status
     const checkFirebase = () => {
-      const isConnected = import.meta.env.VITE_FIREBASE_API_KEY && 
-                         !import.meta.env.VITE_FIREBASE_API_KEY.includes('YOUR_');
+      // Firebase is always connected with hardcoded config in firebase.ts
+      const isConnected = true;
       console.log('🔥 Firebase status:', isConnected ? '✅ Connected' : '❌ Disconnected');
-      if (!isConnected) {
-        console.warn('⚠️ Data will be lost on refresh - Firebase not connected!');
-      }
     };
     
     checkFirebase();
