@@ -36,6 +36,11 @@ jobs:
     - name: Build
       run: npm run build
       
+    - name: Add cache busting files
+      run: |
+        touch dist/.nojekyll
+        echo "Cache-Control: no-cache" > dist/_headers
+      
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       if: github.ref == 'refs/heads/main'
