@@ -17,11 +17,26 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     
+    // Auto-enter guest mode after 5 seconds if Firebase doesn't connect
+    const autoGuestTimeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.log('🎭 Auto-entering guest mode after timeout...');
+        setUser({
+          uid: 'guest-user-123',
+          email: 'guest@editiq.com',
+          displayName: 'Guest User',
+          photoURL: 'https://i.pravatar.cc/150?u=guest'
+        });
+        setLoading(false);
+      }
+    }, 5000); // 5 seconds timeout
+    
     // Check for redirect result first
     const handleRedirectResult = async () => {
       const { user: redirectUser } = await checkRedirectResult();
       if (redirectUser && mounted) {
         console.log('✅ Redirect authentication successful:', redirectUser.email);
+        clearTimeout(autoGuestTimeout);
         setUser({
           uid: redirectUser.uid,
           email: redirectUser.email || '',
@@ -38,6 +53,7 @@ const AppContent: React.FC = () => {
         
         if (user) {
           console.log('✅ Firebase user authenticated:', user.email);
+          clearTimeout(autoGuestTimeout);
           setUser({
             uid: user.uid,
             email: user.email || '',
@@ -55,6 +71,7 @@ const AppContent: React.FC = () => {
       // Cleanup
       return () => {
         mounted = false;
+        clearTimeout(autoGuestTimeout);
         unsubscribe();
       };
     };
