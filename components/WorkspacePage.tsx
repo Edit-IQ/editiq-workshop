@@ -685,84 +685,101 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
 
       {/* Add Project Modal */}
       {isAdding && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl md:text-2xl font-bold text-white">New Project</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 md:p-6 border-b border-slate-800">
+              <h2 className="text-lg md:text-xl font-bold text-white">New Project</h2>
               <button onClick={() => setIsAdding(false)} className="text-slate-500 hover:text-white">
-                <CloseIcon size={24} />
+                <CloseIcon size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleAddTask} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">Client</label>
-                <select 
-                  required
-                  value={newTask.clientId}
-                  onChange={e => setNewTask({...newTask, clientId: e.target.value})}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white"
-                >
-                  <option value="">Select Client</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">Project Title</label>
-                <input 
-                  required
-                  type="text" 
-                  value={newTask.title}
-                  onChange={e => setNewTask({...newTask, title: e.target.value})}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white"
-                  placeholder="e.g. Website Redesign"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">Description</label>
-                <textarea 
-                  value={newTask.description}
-                  onChange={e => setNewTask({...newTask, description: e.target.value})}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white resize-none"
-                  rows={3}
-                  placeholder="Project requirements and details..."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Content */}
+            <div className="p-4 md:p-6">
+              <form onSubmit={handleAddTask} className="space-y-3" id="project-form">
                 <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">Budget (৳)</label>
-                  <input 
-                    type="number" 
-                    value={newTask.budget}
-                    onChange={e => setNewTask({...newTask, budget: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white"
-                    placeholder="e.g. 5000"
-                    min="0"
-                    step="0.01"
-                  />
-                  <p className="text-xs text-slate-600 mt-1">Optional - Project amount</p>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Client</label>
+                  <select 
+                    required
+                    value={newTask.clientId}
+                    onChange={e => setNewTask({...newTask, clientId: e.target.value})}
+                    className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white text-sm"
+                  >
+                    <option value="">Select Client</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">Due Date</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Project Title</label>
                   <input 
                     required
-                    type="date" 
-                    value={newTask.dueDate}
-                    onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white"
+                    type="text" 
+                    value={newTask.title}
+                    onChange={e => setNewTask({...newTask, title: e.target.value})}
+                    className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white text-sm"
+                    placeholder="e.g. Website Redesign"
                   />
                 </div>
-              </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                <button type="button" onClick={() => setIsAdding(false)} className="flex-1 py-3 text-slate-400 font-semibold hover:text-white transition-colors rounded-xl border border-slate-700 hover:border-slate-600">Cancel</button>
-                <button type="submit" className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all">Create Project</button>
-              </div>
-            </form>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Description</label>
+                  <textarea 
+                    value={newTask.description}
+                    onChange={e => setNewTask({...newTask, description: e.target.value})}
+                    className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white resize-none text-sm"
+                    rows={2}
+                    placeholder="Project requirements and details..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1.5">Budget (৳)</label>
+                    <input 
+                      type="number" 
+                      value={newTask.budget}
+                      onChange={e => setNewTask({...newTask, budget: e.target.value})}
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white text-sm"
+                      placeholder="5000"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1.5">Due Date</label>
+                    <input 
+                      required
+                      type="date" 
+                      value={newTask.dueDate}
+                      onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white text-sm"
+                    />
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 p-4 md:p-6 border-t border-slate-800">
+              <button 
+                type="button" 
+                onClick={() => setIsAdding(false)} 
+                className="flex-1 py-2.5 text-slate-400 font-semibold hover:text-white transition-colors rounded-xl border border-slate-700 hover:border-slate-600 text-sm"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                form="project-form"
+                className="flex-1 py-2.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all text-sm"
+              >
+                <span className="hidden sm:inline">Create Project</span>
+                <span className="sm:hidden">Create</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
