@@ -1,6 +1,6 @@
 {
-  "name": "EditIQ - Freelance Finance Hub",
-  "short_name": "EditIQ",
+  "name": "Editiq-Workshop",
+  "short_name": "Editiq-Workshop",
   "description": "Professional freelance project and finance management",
   "start_url": "/editiq-workshop/",
   "display": "standalone",
@@ -9,13 +9,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacepng_xzmk0q.png",
+      "src": "https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacepng_xzmk0q.png",
+      "src": "https://res.cloudinary.com/dvd6oa63p/image/upload/v1768175554/workspacebgpng_zytu0b.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

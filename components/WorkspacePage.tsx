@@ -28,6 +28,7 @@ interface Task {
   description: string;
   status: TaskStatus;
   dueDate: string;
+  budget?: number;
   createdAt: number;
   startedAt?: number;
   completedAt?: number;
@@ -52,7 +53,8 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
     title: '',
     clientId: '',
     description: '',
-    dueDate: new Date().toISOString().split('T')[0]
+    dueDate: new Date().toISOString().split('T')[0],
+    budget: ''
   });
 
   useEffect(() => {
@@ -83,7 +85,8 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
         title: newTask.title,
         description: newTask.description,
         status: 'PENDING',
-        dueDate: newTask.dueDate
+        dueDate: newTask.dueDate,
+        budget: newTask.budget ? parseFloat(newTask.budget) : undefined
       };
       
       console.log('📝 Task data to save:', taskData);
@@ -95,7 +98,8 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
         title: '',
         clientId: '',
         description: '',
-        dueDate: new Date().toISOString().split('T')[0]
+        dueDate: new Date().toISOString().split('T')[0],
+        budget: ''
       });
       setIsAdding(false);
       loadData(); // Refresh data
@@ -226,34 +230,41 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Project Workspace</h1>
-          <p className="text-slate-400">Manage your freelance projects and track progress.</p>
+      <header className="space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Project Workspace</h1>
+            <p className="text-slate-400 text-sm">Manage your freelance projects and track progress.</p>
+          </div>
+          <button 
+            onClick={() => setIsAdding(true)}
+            className="px-4 py-2 md:px-6 md:py-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition-all shadow-lg flex items-center justify-center gap-2 shrink-0"
+          >
+            <Plus size={20} /> <span className="hidden sm:inline">New Project</span>
+          </button>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 overflow-x-auto">
-              {[
-                { id: 'all', label: 'All Time' },
-                { id: 'week', label: 'Last Week' },
-                { id: 'month', label: 'This Month' },
-                { id: '30days', label: 'Last 30 Days' },
-                { id: 'custom', label: 'Select Month' }
-              ].map(period => (
-                <button
-                  key={period.id}
-                  onClick={() => setTimeFilter(period.id as any)}
-                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                    timeFilter === period.id
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {period.label}
-                </button>
-              ))}
-            </div>
+        
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 overflow-x-auto">
+            {[
+              { id: 'all', label: 'All Time' },
+              { id: 'week', label: 'Last Week' },
+              { id: 'month', label: 'This Month' },
+              { id: '30days', label: 'Last 30 Days' },
+              { id: 'custom', label: 'Select Month' }
+            ].map(period => (
+              <button
+                key={period.id}
+                onClick={() => setTimeFilter(period.id as any)}
+                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                  timeFilter === period.id
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {period.label}
+              </button>
+            ))}
           </div>
           
           {/* Month Selector */}
@@ -268,29 +279,22 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
               />
             </div>
           )}
-          
-          <button 
-            onClick={() => setIsAdding(true)}
-            className="px-6 py-3 bg-blue-600 rounded-xl text-white font-bold hover:bg-blue-700 transition-all shadow-lg flex items-center justify-center gap-2"
-          >
-            <Plus size={20} /> New Project
-          </button>
         </div>
       </header>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {[
           { label: 'Total Projects', value: stats.total, color: 'slate', icon: Calendar },
           { label: 'In Queue', value: stats.pending, color: 'amber', icon: Clock },
           { label: 'Working', value: stats.working, color: 'blue', icon: Clock },
           { label: 'Completed', value: stats.completed, color: 'emerald', icon: CheckCircle }
         ].map((stat, idx) => (
-          <div key={idx} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 flex items-center justify-between">
-            <div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">{stat.label}</p>
-              <h3 className="text-3xl font-bold text-white mt-1">{stat.value}</h3>
-              <div className="space-y-1 mt-2">
+          <div key={idx} className="bg-slate-900 border border-slate-800 rounded-2xl md:rounded-3xl p-4 md:p-6 flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-wider truncate">{stat.label}</p>
+              <h3 className="text-2xl md:text-3xl font-bold text-white mt-1">{stat.value}</h3>
+              <div className="space-y-1 mt-2 hidden md:block">
                 <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest">
                   {timeFilter === 'all' ? 'All Time' : 
                    timeFilter === 'week' ? 'Last 7 Days' :
@@ -307,19 +311,19 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                 </p>
               </div>
             </div>
-            <div className={`p-3 rounded-2xl bg-${stat.color}-500/10 text-${stat.color}-500`}>
-              <stat.icon size={24} />
+            <div className={`p-2 md:p-3 rounded-xl md:rounded-2xl bg-${stat.color}-500/10 text-${stat.color}-500 shrink-0`}>
+              <stat.icon size={20} className="md:w-6 md:h-6" />
             </div>
           </div>
         ))}
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h4 className="text-lg font-bold text-white">Progress Timeline</h4>
-            <span className="text-xs text-slate-500 bg-slate-800 px-3 py-1 rounded-full">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl md:rounded-3xl p-4 md:p-8">
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <h4 className="text-base md:text-lg font-bold text-white">Progress Timeline</h4>
+            <span className="text-[10px] md:text-xs text-slate-500 bg-slate-800 px-2 md:px-3 py-1 rounded-full">
               {timeFilter === 'all' ? 'Last 7 Days' : 
                timeFilter === 'week' ? 'Last 7 Days' :
                timeFilter === 'month' ? 'Last 30 Days' : 
@@ -327,12 +331,12 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                new Date(selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </span>
           </div>
-          <div className="h-64">
+          <div className="h-48 md:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyProgress}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
-                <XAxis dataKey="date" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                <XAxis dataKey="date" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                 <Tooltip 
                   contentStyle={{ 
                     backgroundColor: '#0f172a', 
@@ -349,10 +353,10 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h4 className="text-lg font-bold text-white">Status Distribution</h4>
-            <span className="text-xs text-slate-500 bg-slate-800 px-3 py-1 rounded-full">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl md:rounded-3xl p-4 md:p-8">
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <h4 className="text-base md:text-lg font-bold text-white">Status Distribution</h4>
+            <span className="text-[10px] md:text-xs text-slate-500 bg-slate-800 px-2 md:px-3 py-1 rounded-full">
               {timeFilter === 'all' ? 'All Time' : 
                timeFilter === 'week' ? 'Last Week' :
                timeFilter === 'month' ? 'This Month' : 
@@ -360,15 +364,15 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                new Date(selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </span>
           </div>
-          <div className="h-64">
+          <div className="h-48 md:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={stats.statusDistribution}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
+                  innerRadius={50}
+                  outerRadius={70}
                   paddingAngle={5}
                   dataKey="value"
                 >
@@ -422,12 +426,14 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
 
       {/* Projects Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-800/50">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Client</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Project</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Budget</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Work Times</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Due Date</th>
@@ -451,6 +457,15 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                           <p className="text-xs text-slate-500 mt-1 line-clamp-2">{task.description}</p>
                         )}
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {task.budget ? (
+                        <span className="text-sm font-bold text-emerald-400">
+                          ৳{task.budget.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-600">Not set</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <select
@@ -561,25 +576,119 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
               })}
             </tbody>
           </table>
-          
-          {filteredTasks.length === 0 && (
-            <div className="py-20 text-center">
-              <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Calendar className="w-8 h-8 text-slate-600" />
-              </div>
-              <h3 className="text-xl font-bold text-white">No Projects Found</h3>
-              <p className="text-slate-500 mt-2">Start by creating your first project.</p>
-            </div>
-          )}
         </div>
+
+        {/* Mobile Card View */}
+        <div className="lg:hidden divide-y divide-slate-800">
+          {filteredTasks.map(task => {
+            const client = clients.find(c => c.id === task.clientId);
+            return (
+              <div key={task.id} className="p-4 hover:bg-slate-800/30 transition-colors">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded-lg">
+                        {client?.name || 'Unknown'}
+                      </span>
+                      {task.budget && (
+                        <span className="text-xs font-bold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg">
+                          ৳{task.budget.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-white text-sm">{task.title}</h4>
+                    {task.description && (
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{task.description}</p>
+                    )}
+                  </div>
+                  <button 
+                    onClick={() => deleteTask(task.id)}
+                    className="text-slate-600 hover:text-rose-500 p-2 rounded-lg ml-2"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">Status</span>
+                    <select
+                      value={task.status}
+                      onChange={(e) => updateTaskStatus(task.id, e.target.value as TaskStatus)}
+                      className={`text-xs font-bold uppercase px-2 py-1 rounded-lg border outline-none cursor-pointer ${STATUS_COLORS[task.status]}`}
+                      style={{
+                        backgroundColor: task.status === 'PENDING' ? '#1e293b' : 
+                                       task.status === 'WORKING' ? '#1e40af' : '#059669',
+                        color: 'white'
+                      }}
+                    >
+                      <option value="PENDING" style={{ backgroundColor: '#1e293b', color: 'white' }}>Pending</option>
+                      <option value="WORKING" style={{ backgroundColor: '#1e40af', color: 'white' }}>Working</option>
+                      <option value="COMPLETED" style={{ backgroundColor: '#059669', color: 'white' }}>Completed</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">Due Date</span>
+                    <span className="text-xs text-slate-300">
+                      {new Date(task.dueDate).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })}
+                    </span>
+                  </div>
+
+                  {task.startedAt && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Started</span>
+                      <span className="text-xs text-blue-400">
+                        {new Date(task.startedAt).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                  )}
+
+                  {task.completedAt && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Completed</span>
+                      <span className="text-xs text-green-400">
+                        {new Date(task.completedAt).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+          
+        {filteredTasks.length === 0 && (
+          <div className="py-20 text-center">
+            <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-8 h-8 text-slate-600" />
+            </div>
+            <h3 className="text-xl font-bold text-white">No Projects Found</h3>
+            <p className="text-slate-500 mt-2">Start by creating your first project.</p>
+          </div>
+        )}
       </div>
 
       {/* Add Project Modal */}
       {isAdding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">New Project</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-white">New Project</h2>
               <button onClick={() => setIsAdding(false)} className="text-slate-500 hover:text-white">
                 <CloseIcon size={24} />
               </button>
@@ -622,19 +731,35 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">Due Date</label>
-                <input 
-                  required
-                  type="date" 
-                  value={newTask.dueDate}
-                  onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Budget (৳)</label>
+                  <input 
+                    type="number" 
+                    value={newTask.budget}
+                    onChange={e => setNewTask({...newTask, budget: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white"
+                    placeholder="e.g. 5000"
+                    min="0"
+                    step="0.01"
+                  />
+                  <p className="text-xs text-slate-600 mt-1">Optional - Project amount</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Due Date</label>
+                  <input 
+                    required
+                    type="date" 
+                    value={newTask.dueDate}
+                    onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white"
+                  />
+                </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsAdding(false)} className="flex-1 py-3 text-slate-400 font-semibold hover:text-white transition-colors">Cancel</button>
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <button type="button" onClick={() => setIsAdding(false)} className="flex-1 py-3 text-slate-400 font-semibold hover:text-white transition-colors rounded-xl border border-slate-700 hover:border-slate-600">Cancel</button>
                 <button type="submit" className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all">Create Project</button>
               </div>
             </form>

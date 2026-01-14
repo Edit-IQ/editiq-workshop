@@ -29,6 +29,19 @@ export interface Client {
   createdAt: number;
 }
 
+export interface WorkspaceTask {
+  id: string;
+  clientId: string;
+  title: string;
+  description: string;
+  status: 'PENDING' | 'WORKING' | 'COMPLETED';
+  dueDate: string;
+  budget?: number; // Optional project budget/amount
+  createdAt: number;
+  startedAt?: number;
+  completedAt?: number;
+}
+
 export interface Transaction {
   id: string;
   userId: string;
