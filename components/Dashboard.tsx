@@ -664,13 +664,14 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
          </div>
       )}
 
-      {/* Add Entry Button */}
+      {/* Add Entry Button - Large Circular Floating Button */}
       {!isAdding && (
         <button 
            onClick={() => setIsAdding(true)}
-           className="fixed bottom-28 right-8 md:bottom-8 md:right-8 px-6 py-3 bg-indigo-600 rounded-xl text-white font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 z-50 active:scale-95"
+           className="fixed bottom-28 right-8 md:bottom-8 md:right-8 w-20 h-20 bg-blue-600 rounded-full text-white font-bold hover:bg-blue-700 transition-all shadow-2xl shadow-blue-600/40 flex items-center justify-center z-50 active:scale-95 hover:scale-110"
+           title="Add Entry"
         >
-           <Plus size={20} /> Add Entry
+           <Plus size={32} strokeWidth={3} />
         </button>
       )}
     </div>
