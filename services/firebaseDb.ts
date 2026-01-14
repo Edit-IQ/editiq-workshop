@@ -165,7 +165,7 @@ export const getDirectFirebaseData = async () => {
 export const firebaseDb = {
   // Check if we should use localStorage (for demo users only)
   shouldUseLocalStorage(userId: string): boolean {
-    return userId === 'demo-user-123';
+    return userId === 'guest-user-123';
   },
 
   // Map current user ID to old Firebase user ID for data access

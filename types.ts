@@ -16,6 +16,7 @@ export enum ProjectType {
   VIDEO_EDITING = 'Video Editing',
   GRAPHIC_DESIGN = 'Graphic Design',
   CONSULTATION = 'Consultation'
+  
 }
 
 export interface Client {

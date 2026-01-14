@@ -86,23 +86,25 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
-  const isDemoUser = userId === 'demo-user-123';
+  const isDemoUser = userId === 'guest-user-123';
   
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [activeType, setActiveType] = useState<TransactionType>(TransactionType.INCOME);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('daily');
   const [timeFilter, setTimeFilter] = useState<'all' | 'week' | 'month' | '30days' | 'custom'>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM format
   const [clientFilter, setClientFilter] = useState<string>('all'); // Add client filter to Dashboard too
 
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newTx, setNewTx] = useState({
+    amount: 0,
+    type: TransactionType.INCOME,
+    category: '',
+    date: new Date().toISOString().split('T')[0],
+    note: '',
+    clientId: ''
+  });
 
   useEffect(() => {
     console.log('🔍 Dashboard useEffect - User ID:', userId, 'isDemoUser:', isDemoUser);
@@ -307,7 +309,7 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
       BackupService.downloadBackup(backupData)
       
       // Also try manual Supabase backup if RLS is blocking
-      if (userId !== 'demo-user-123') {
+      if (userId !== 'guest-user-123') {
         try {
           const manualBackup = await BackupService.manualSupabaseBackup()
           if (manualBackup.clients.length > 0 || manualBackup.transactions.length > 0 || manualBackup.credentials.length > 0) {
@@ -336,34 +338,32 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) return;
-    setIsSubmitting(true);
+    if (newTx.amount <= 0) return;
+    
     try {
-      const transactionData = {
-        amount: parseFloat(amount),
-        type: activeType,
-        category: category || (activeType === TransactionType.INCOME ? 'Income' : 'General'),
-        date: date,
-        note: '',
-        clientId: clientId || undefined
-      };
-
       if (isDemoUser) {
-        localDb.addTransaction(userId, transactionData);
+        localDb.addTransaction(userId, newTx);
+        // Force immediate reload of transactions
+        const updatedTxs = localDb.getTransactions(userId);
+        setTransactions(updatedTxs);
       } else {
-        await firebaseDb.addTransaction(userId, transactionData);
+        await firebaseDb.addTransaction(userId, newTx);
       }
-
-      setAmount(''); 
-      setCategory(''); 
-      setClientId('');
+      
+      setNewTx({
+        amount: 0,
+        type: TransactionType.INCOME,
+        category: '',
+        date: new Date().toISOString().split('T')[0],
+        note: '',
+        clientId: ''
+      });
       setIsAdding(false);
       setLastSaved(new Date().toLocaleTimeString());
       setTimeout(() => setLastSaved(null), 3000);
-    } catch (err) { 
-      alert("Sync failed."); 
-    } finally { 
-      setIsSubmitting(false); 
+    } catch (error) {
+      console.error('Failed to add transaction:', error);
+      alert('Failed to add transaction. Please try again.');
     }
   };
 
@@ -568,116 +568,90 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
 
       {/* Transaction Modal */}
       {isAdding && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl animate-in zoom-in duration-200">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">New Entry</h2>
-              <button 
-                onClick={() => setIsAdding(false)} 
-                className="p-2 text-slate-400 hover:text-white transition-colors"
-              >
-                <CloseIcon size={20} />
-              </button>
-            </div>
-
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+            <h2 className="text-2xl font-bold mb-6">New Entry</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Income/Expense Toggle */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex p-1 bg-slate-800 rounded-xl mb-6">
                 <button 
-                   type="button"
-                   onClick={() => setActiveType(TransactionType.INCOME)}
-                   className={`py-3 rounded-lg text-sm font-medium transition-all ${activeType === TransactionType.INCOME ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                  type="button"
+                  onClick={() => setNewTx({...newTx, type: TransactionType.INCOME})}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${newTx.type === TransactionType.INCOME ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                 >
-                   Income
+                  Income
                 </button>
                 <button 
-                   type="button"
-                   onClick={() => setActiveType(TransactionType.EXPENSE)}
-                   className={`py-3 rounded-lg text-sm font-medium transition-all ${activeType === TransactionType.EXPENSE ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                  type="button"
+                  onClick={() => setNewTx({...newTx, type: TransactionType.EXPENSE})}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${newTx.type === TransactionType.EXPENSE ? 'bg-red-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                 >
-                   Expense
+                  Expense
                 </button>
               </div>
-              
-              {/* Amount and Date */}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2">Amount (₹)</label>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Amount (₹)</label>
                   <input 
-                     required
-                     type="number"
-                     step="0.01"
-                     value={amount}
-                     onChange={e => setAmount(e.target.value)}
-                     placeholder="0"
-                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none text-white"
+                    required
+                    type="number" 
+                    value={newTx.amount}
+                    onChange={e => setNewTx({...newTx, amount: parseFloat(e.target.value) || 0})}
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none"
+                    placeholder="0.00"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2">Date</label>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Date</label>
                   <input 
-                     required
-                     type="date"
-                     value={date}
-                     onChange={e => setDate(e.target.value)}
-                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none text-white"
+                    required
+                    type="date" 
+                    value={newTx.date}
+                    onChange={e => setNewTx({...newTx, date: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none"
                   />
                 </div>
               </div>
-              
-              {/* Note/Description */}
+
               <div>
-                <label className="block text-xs text-slate-400 mb-2">Note / Description</label>
+                <label className="block text-sm font-medium text-slate-400 mb-2">Note / Description</label>
                 <input 
-                   type="text"
-                   value={category}
-                   onChange={e => setCategory(e.target.value)}
-                   placeholder="Subscription, client payment, etc."
-                   className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none text-white placeholder-slate-500"
+                  type="text" 
+                  value={newTx.note}
+                  onChange={e => setNewTx({...newTx, note: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none"
+                  placeholder="Subscription, client payment, etc."
                 />
               </div>
-              
-              {/* Category and Client */}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2">Category</label>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Category</label>
                   <input 
-                     type="text"
-                     placeholder="e.g. Adobe Suite"
-                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none text-white placeholder-slate-500"
+                    required
+                    type="text" 
+                    value={newTx.category}
+                    onChange={e => setNewTx({...newTx, category: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none"
+                    placeholder="e.g. Adobe Suite"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2">Link Client (Optional)</label>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Link Client (Optional)</label>
                   <select 
-                     value={clientId}
-                     onChange={e => setClientId(e.target.value)}
-                     className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none text-white appearance-none"
+                    value={newTx.clientId}
+                    onChange={e => setNewTx({...newTx, clientId: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none appearance-none"
                   >
-                     <option value="">None</option>
-                     {clients.map(client => (
-                        <option key={client.id} value={client.id}>{client.name}</option>
-                     ))}
+                    <option value="">None</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
               </div>
-              
-              {/* Action Buttons */}
+
               <div className="flex gap-3 pt-4">
-                <button 
-                   type="button"
-                   onClick={() => setIsAdding(false)}
-                   className="flex-1 py-3 text-slate-400 font-medium hover:text-white transition-colors"
-                >
-                   Cancel
-                </button>
-                <button 
-                   type="submit" 
-                   disabled={isSubmitting}
-                   className="flex-1 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50"
-                >
-                   {isSubmitting ? 'Saving...' : 'Save Entry'}
-                </button>
+                <button type="button" onClick={() => setIsAdding(false)} className="flex-1 py-3 text-slate-400 font-semibold hover:text-white transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all">Save Entry</button>
               </div>
             </form>
           </div>
@@ -690,13 +664,13 @@ const Dashboard: React.FC<DashboardProps> = ({ userId }) => {
          </div>
       )}
 
-      {/* Floating Action Button */}
+      {/* Add Entry Button */}
       {!isAdding && (
         <button 
-           onClick={() => setIsAdding(!isAdding)}
-           className="fixed bottom-28 right-8 md:bottom-8 md:right-8 w-16 h-16 rounded-full font-bold transition-all flex items-center justify-center shadow-2xl z-50 bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 active:scale-95"
+           onClick={() => setIsAdding(true)}
+           className="fixed bottom-28 right-8 md:bottom-8 md:right-8 px-6 py-3 bg-indigo-600 rounded-xl text-white font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 z-50 active:scale-95"
         >
-           <Plus size={28} strokeWidth={2.5} />
+           <Plus size={20} /> Add Entry
         </button>
       )}
     </div>

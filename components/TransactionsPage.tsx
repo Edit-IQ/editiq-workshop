@@ -19,7 +19,7 @@ const formatCurrency = (value: number) => {
 };
 
 const TransactionsPage: React.FC<TransactionsPageProps> = ({ userId }) => {
-  const isDemoUser = userId === 'demo-user-123';
+  const isDemoUser = userId === 'guest-user-123';
   
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);

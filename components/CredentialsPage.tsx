@@ -22,7 +22,7 @@ interface CredentialsPageProps {
 }
 
 const CredentialsPage: React.FC<CredentialsPageProps> = ({ userId }) => {
-  const isDemoUser = userId === 'demo-user-123';
+  const isDemoUser = userId === 'guest-user-123';
   
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [search, setSearch] = useState('');

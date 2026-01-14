@@ -56,7 +56,7 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
     checkFirebase();
   }, [userId]);
 
-  const isDemoUser = userId === 'demo-user-123';
+  const isDemoUser = userId === 'guest-user-123';
 
   const loadData = async () => {
     try {
