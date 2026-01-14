@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig(({ mode }) => ({
-  base: mode === 'production' ? '/editiq-workshop/' : '/',
+export default defineConfig({
+  base: '/editiq-workshop/',
   server: {
     port: 3000,
     host: '0.0.0.0',
@@ -16,4 +16,4 @@ export default defineConfig(({ mode }) => ({
     outDir: 'dist',
     assetsDir: 'assets'
   }
-}));
+});
