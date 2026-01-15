@@ -86,7 +86,7 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
         description: newTask.description,
         status: 'PENDING',
         dueDate: newTask.dueDate,
-        budget: newTask.budget ? parseFloat(newTask.budget) : undefined
+        ...(newTask.budget && newTask.budget.trim() !== '' && { budget: parseFloat(newTask.budget) })
       };
       
       console.log('📝 Task data to save:', taskData);
@@ -102,7 +102,8 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
         budget: ''
       });
       setIsAdding(false);
-      loadData(); // Refresh data
+      await loadData(); // Refresh data
+      console.log('✅ Project list refreshed');
     } catch (error) {
       console.error('❌ Failed to add task:', error);
       alert(`Failed to add project: ${error.message}`);
@@ -461,7 +462,7 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                     <td className="px-6 py-4">
                       {task.budget ? (
                         <span className="text-sm font-bold text-emerald-400">
-                          ৳{task.budget.toLocaleString()}
+                          ₹{task.budget.toLocaleString()}
                         </span>
                       ) : (
                         <span className="text-xs text-slate-600">Not set</span>
@@ -592,7 +593,7 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
                       </span>
                       {task.budget && (
                         <span className="text-xs font-bold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg">
-                          ৳{task.budget.toLocaleString()}
+                          ₹{task.budget.toLocaleString()}
                         </span>
                       )}
                     </div>
@@ -736,15 +737,15 @@ const WorkspacePage: React.FC<WorkspacePageProps> = ({ userId }) => {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1.5">Budget (৳)</label>
+                    <label className="block text-xs font-medium text-slate-400 mb-1.5">Budget in ₹ (Optional)</label>
                     <input 
                       type="number" 
                       value={newTask.budget}
                       onChange={e => setNewTask({...newTask, budget: e.target.value})}
                       className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl focus:border-blue-500 focus:outline-none text-white text-sm"
-                      placeholder="5000"
+                      placeholder="Enter budget in INR"
                       min="0"
-                      step="0.01"
+                      step="1"
                     />
                   </div>
 

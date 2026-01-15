@@ -32,7 +32,8 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
     name: '',
     platform: Platform.YOUTUBE,
     projectType: ProjectType.VIDEO_EDITING,
-    notes: ''
+    notes: '',
+    budget: ''
   });
 
   // Quick Payment State
@@ -100,23 +101,38 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
     
     try {
       setIsSaving(true);
+      console.log('📝 Adding client:', newClient, 'for userId:', userId, 'isDemoUser:', isDemoUser);
+      
+      const clientData = {
+        name: newClient.name,
+        platform: newClient.platform,
+        projectType: newClient.projectType,
+        notes: newClient.notes,
+        ...(newClient.budget && { budget: parseFloat(newClient.budget) })
+      };
       
       if (isDemoUser) {
-        localDb.addClient(userId, newClient);
+        const clientId = localDb.addClient(userId, clientData);
+        console.log('✅ Client added to localStorage with ID:', clientId);
       } else {
-        await firebaseDb.addClient(userId, newClient);
+        const clientId = await firebaseDb.addClient(userId, clientData);
+        console.log('✅ Client added to Firebase with ID:', clientId);
       }
+      
+      // Wait for data to reload before closing modal
+      await loadData();
+      console.log('✅ Client list refreshed, closing modal');
       
       setNewClient({
         name: '',
         platform: Platform.YOUTUBE,
         projectType: ProjectType.VIDEO_EDITING,
-        notes: ''
+        notes: '',
+        budget: ''
       });
       setIsAdding(false);
-      loadData();
     } catch (error) {
-      console.error('Failed to add client:', error);
+      console.error('❌ Failed to add client:', error);
       alert('Failed to add client. Please try again.');
     } finally {
       setIsSaving(false);
@@ -260,6 +276,12 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
                   <span className="text-slate-500">Service</span>
                   <span className="font-medium text-slate-300">{client.projectType}</span>
                 </div>
+                {client.budget && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Budget</span>
+                    <span className="font-medium text-blue-400">{formatCurrency(client.budget)}</span>
+                  </div>
+                )}
                 <p className="text-xs text-slate-500 line-clamp-2 italic pt-2">
                   {client.notes || "No notes."}
                 </p>
@@ -333,6 +355,18 @@ const ClientsPage: React.FC<ClientsPageProps> = ({ userId }) => {
                   onChange={e => setNewClient({...newClient, notes: e.target.value})}
                   className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none h-32 resize-none text-white"
                   placeholder="Preferences, deadlines, etc."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">Budget in ₹ (Optional)</label>
+                <input 
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={newClient.budget}
+                  onChange={e => setNewClient({...newClient, budget: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-indigo-500 focus:outline-none text-white"
+                  placeholder="Enter budget amount in INR"
                 />
               </div>
               <div className="flex gap-3 pt-4">

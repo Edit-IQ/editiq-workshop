@@ -26,6 +26,7 @@ export interface Client {
   platform: Platform;
   projectType: ProjectType;
   notes: string;
+  budget?: number; // Optional budget in INR
   createdAt: number;
 }
 
